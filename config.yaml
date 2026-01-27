@@ -180,7 +180,7 @@ rule-providers:
     type: http
     behavior: domain
     format: mrs
-    url: https://github.com/Ivan-Stepalin/xkeen-configuration-mihomo/raw/refs/heads/main/rules/kino.mrs
+    url: https://github.com/amatol/xkeen-configuration/raw/refs/heads/main/rules/kino.mrs
     path: ./rule-providers/kino-domains.mrs
     interval: 86400
 
@@ -204,7 +204,7 @@ rule-providers:
     type: http
     behavior: ipcidr
     format: mrs
-    url: https://github.com/Ivan-Stepalin/xkeen-configuration-mihomo/raw/refs/heads/main/rules/roblox-ips.mrs
+    url: https://github.com/amatol/xkeen-configuration/raw/refs/heads/main/rules/roblox-ips.mrs
     path: ./rule-providers/roblox-ips.mrs
     interval: 86400
 
@@ -220,7 +220,7 @@ rule-providers:
     type: http
     behavior: domain
     format: mrs
-    url: https://github.com/Ivan-Stepalin/xkeen-configuration-mihomo/raw/refs/heads/main/rules/community.mrs
+    url: https://raw.githubusercontent.com/Ivan-Stepalin/xkeen-config-mihomo/main/rules/community.mrs
     path: ./rule-providers/community-domains.mrs
     interval: 86400
 
