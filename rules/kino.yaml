@@ -1,0 +1,14 @@
+payload:
+    - kino.pub
+    - 'cdnservices.*'
+    - cdn32.lol
+    - firebaseremoteconfig.googleapis.com
+    - firebaseremoteconfigrealtime.googleapis.com
+    - kp-pro.cloud
+    - firebaseinstallations.googleapis.com
+    - firebase-settings.crashlytics.com
+    - cdn4t.store
+    - cdntogo.net
+    - kinopub.online
+    - zerkalo.xyz
+    - 'cdn-service.*'
