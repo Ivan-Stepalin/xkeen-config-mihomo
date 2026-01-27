@@ -1,8 +1,9 @@
 payload:
-    - account.entropiauniverse.com
-    - user.auth.xboxlive.com
-    - xsts.auth.xboxlive.com
-    - +.gomining.com
-    - +.gmt.io
-    - +.nintendo.net
-    - +.nintendo.com
+  - account.entropiauniverse.com
+  - user.auth.xboxlive.com
+  - xsts.auth.xboxlive.com
+  - +.gomining.com
+  - +.gmt.io
+  - +.nintendo.net
+  - +.nintendo.com
+  - +.masteritaly.com
