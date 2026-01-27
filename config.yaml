@@ -63,7 +63,7 @@ proxy-groups:
 
   - name: Кинотеатры
     type: select
-    icon: https://github.com/Ivan-Stepalin/xkeen-configuration-mihomo/raw/refs/heads/main/group-icons/kino.png
+    icon: https://github.com/amatol/xkeen-configuration/raw/refs/heads/main/group-icons/kino.png
     include-all: true
     proxies:
       - Свободный интернет
@@ -95,7 +95,7 @@ proxy-groups:
 
   - name: Community
     type: select
-    icon: https://github.com/Ivan-Stepalin/xkeen-configuration-mihomo/raw/refs/heads/main/group-icons/community.png
+    icon: https://github.com/amatol/xkeen-configuration/raw/refs/heads/main/group-icons/community.png
     include-all: true
     proxies:
       - Свободный интернет
@@ -126,7 +126,7 @@ proxy-groups:
 
   - name: TikTok
     type: select
-    icon: https://github.com/Ivan-Stepalin/xkeen-configuration-mihomo/raw/refs/heads/main/group-icons/tiktok.png
+    icon: https://github.com/amatol/xkeen-configuration/raw/refs/heads/main/group-icons/tiktok.png
     include-all: true
     proxies:
       - Свободный интернет
@@ -134,7 +134,7 @@ proxy-groups:
 
   - name: Roblox
     type: select
-    icon: https://github.com/Ivan-Stepalin/xkeen-configuration-mihomo/raw/refs/heads/main/group-icons/roblox.png
+    icon: https://github.com/amatol/xkeen-configuration/raw/refs/heads/main/group-icons/roblox.png
     include-all: true
     proxies:
       - Свободный интернет
