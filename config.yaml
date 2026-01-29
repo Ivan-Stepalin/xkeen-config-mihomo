@@ -300,6 +300,7 @@ rules:
   - GEOSITE,category-ai-!cn,AI
   - GEOSITE,spotify,Spotify
   - OR,((GEOSITE,youtube),(DOMAIN-SUFFIX,googleusercontent.com)),YouTube
+  - DOMAIN-SUFFIX,googleapis.com,Свободный интернет
   - GEOSITE,twitch,Twitch
   - GEOSITE,twitter,Twitter
   - RULE-SET,discord,Discord
