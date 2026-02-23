@@ -1,0 +1,6 @@
+# AI-custom: правила для AI-сервисов (Google Assistant и др.)
+# Политику задаёт RULE-SET,AI-custom,AI в config — выбор прокси в группе AI
+# behavior: classical, format: yaml
+payload:
+  - OR,((DOMAIN,assistant-s3-pa.googleapis.com),(DOMAIN,androidwearcloudsync-pa.googleapis.com))
+  - DOMAIN-SUFFIX,requestly.io
