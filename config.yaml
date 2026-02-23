@@ -369,16 +369,20 @@ rule-providers:
     interval: 86400
 
   AI-custom:
-    type: file
+    type: http
     behavior: classical
     format: yaml
-    path: ./rules/AI.yaml
+    url: https://raw.githubusercontent.com/Ivan-Stepalin/xkeen-config-mihomo/main/rules/AI.yaml
+    path: ./rule-providers/ai-custom.yaml
+    interval: 86400
 
   others:
-    type: file
+    type: http
     behavior: classical
     format: yaml
-    path: ./rules/others.yaml
+    url: https://raw.githubusercontent.com/Ivan-Stepalin/xkeen-config-mihomo/main/rules/others.yaml
+    path: ./rule-providers/others.yaml
+    interval: 86400
 
 rules:
   - AND,((DST-PORT,443),(NETWORK,UDP)),QUIC
