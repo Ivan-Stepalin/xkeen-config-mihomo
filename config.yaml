@@ -190,7 +190,7 @@ proxy-groups:
 
   - name: OTHERS
     type: select
-    icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Other.png
+    icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Global.png
     use:
       - subscription
     exclude-filter: 🇷🇺|🇰🇿|🇺🇦
