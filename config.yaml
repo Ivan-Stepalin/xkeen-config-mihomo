@@ -170,7 +170,7 @@ proxy-groups:
 
   - name: PlayStation
     type: select
-    icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Game.png
+    icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/PlayStation.png
     use:
       - subscription
     exclude-filter: 🇷🇺|🇰🇿|🇺🇦
@@ -180,7 +180,17 @@ proxy-groups:
 
   - name: Nintendo
     type: select
-    icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Game.png
+    icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Nintendo.png
+    use:
+      - subscription
+    exclude-filter: 🇷🇺|🇰🇿|🇺🇦
+    proxies:
+      - Свободный интернет
+      - DIRECT
+
+  - name: Mihoyo
+    type: select
+    icon: https://raw.githubusercontent.com/clash-verge-rev/icon-hub/main/mihoyo/ys.png
     use:
       - subscription
     exclude-filter: 🇷🇺|🇰🇿|🇺🇦
@@ -288,6 +298,14 @@ rule-providers:
     format: mrs
     url: https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/nintendo.mrs
     path: ./rule-providers/nintendo-domains.mrs
+    interval: 86400
+
+  mihoyo:
+    type: http
+    behavior: classical
+    format: yaml
+    url: https://raw.githubusercontent.com/Ivan-Stepalin/xkeen-config-mihomo/main/rules/mihoyo.yaml
+    path: ./rule-providers/mihoyo.yaml
     interval: 86400
 
   community:
@@ -405,6 +423,7 @@ rules:
   - RULE-SET,roblox-ips,Roblox
   - RULE-SET,playstation,PlayStation
   - RULE-SET,nintendo,Nintendo
+  - RULE-SET,mihoyo,Mihoyo
   - RULE-SET,others,OTHERS
   - RULE-SET,refilter-domains,Свободный интернет
   - RULE-SET,refilter-ips,Свободный интернет
