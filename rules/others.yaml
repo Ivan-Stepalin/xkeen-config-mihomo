@@ -1,0 +1,4 @@
+# OTHERS: прочие домены (политику задаёт RULE-SET,others,OTHERS в config)
+# behavior: classical, format: yaml — матчеры без политики
+payload:
+  - DOMAIN-SUFFIX,masteritaly.com

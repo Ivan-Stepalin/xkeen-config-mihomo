@@ -40,7 +40,9 @@ proxy-groups:
   - name: YouTube
     type: select
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/YouTube.png
-    include-all: true
+    use:
+      - subscription
+    exclude-filter: 🇷🇺|🇰🇿|🇺🇦
     proxies:
       - Свободный интернет
       - DIRECT
@@ -48,7 +50,9 @@ proxy-groups:
   - name: Discord
     type: select
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Discord.png
-    include-all: true
+    use:
+      - subscription
+    exclude-filter: 🇷🇺|🇰🇿|🇺🇦
     proxies:
       - Свободный интернет
       - DIRECT
@@ -56,15 +60,19 @@ proxy-groups:
   - name: Twitch
     type: select
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Twitch.png
-    include-all: true
+    use:
+      - subscription
+    exclude-filter: 🇷🇺|🇰🇿|🇺🇦
     proxies:
-      - DIRECT
       - Свободный интернет
+      - DIRECT
 
   - name: Кинотеатры
     type: select
     icon: https://github.com/amatol/xkeen-configuration/raw/refs/heads/main/group-icons/kino.png
-    include-all: true
+    use:
+      - subscription
+    exclude-filter: 🇷🇺|🇰🇿|🇺🇦
     proxies:
       - Свободный интернет
       - DIRECT
@@ -72,7 +80,9 @@ proxy-groups:
   - name: Meta
     type: select
     icon: https://github.com/zxc-rv/assets/raw/refs/heads/main/group-icons/meta.png
-    include-all: true
+    use:
+      - subscription
+    exclude-filter: 🇷🇺|🇰🇿|🇺🇦
     proxies:
       - Свободный интернет
       - DIRECT
@@ -80,7 +90,9 @@ proxy-groups:
   - name: Spotify
     type: select
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Spotify.png
-    include-all: true
+    use:
+      - subscription
+    exclude-filter: 🇷🇺|🇰🇿|🇺🇦
     proxies:
       - Свободный интернет
       - DIRECT
@@ -88,15 +100,19 @@ proxy-groups:
   - name: Telegram
     type: select
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Telegram.png
-    include-all: true
+    use:
+      - subscription
+    exclude-filter: 🇷🇺|🇰🇿|🇺🇦
     proxies:
-      - DIRECT
       - Свободный интернет
+      - DIRECT
 
   - name: Community
     type: select
     icon: https://github.com/amatol/xkeen-configuration/raw/refs/heads/main/group-icons/community.png
-    include-all: true
+    use:
+      - subscription
+    exclude-filter: 🇷🇺|🇰🇿|🇺🇦
     proxies:
       - Свободный интернет
       - DIRECT
@@ -104,22 +120,30 @@ proxy-groups:
   - name: Cloudflare
     type: select
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Cloudflare.png
-    include-all: true
+    use:
+      - subscription
+    exclude-filter: 🇷🇺|🇰🇿|🇺🇦
     proxies:
       - PASS
       - Свободный интернет
+      - DIRECT
 
   - name: AI
     type: select
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Bot.png
-    include-all: true
+    use:
+      - subscription
+    exclude-filter: 🇷🇺|🇰🇿|🇺🇦
     proxies:
       - Свободный интернет
+      - DIRECT
 
   - name: Twitter
     type: select
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Twitter.png
-    include-all: true
+    use:
+      - subscription
+    exclude-filter: 🇷🇺|🇰🇿|🇺🇦
     proxies:
       - Свободный интернет
       - DIRECT
@@ -127,7 +151,9 @@ proxy-groups:
   - name: TikTok
     type: select
     icon: https://github.com/amatol/xkeen-configuration/raw/refs/heads/main/group-icons/tiktok.png
-    include-all: true
+    use:
+      - subscription
+    exclude-filter: 🇷🇺|🇰🇿|🇺🇦
     proxies:
       - Свободный интернет
       - DIRECT
@@ -135,7 +161,39 @@ proxy-groups:
   - name: Roblox
     type: select
     icon: https://github.com/amatol/xkeen-configuration/raw/refs/heads/main/group-icons/roblox.png
-    include-all: true
+    use:
+      - subscription
+    exclude-filter: 🇷🇺|🇰🇿|🇺🇦
+    proxies:
+      - Свободный интернет
+      - DIRECT
+
+  - name: PlayStation
+    type: select
+    icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Game.png
+    use:
+      - subscription
+    exclude-filter: 🇷🇺|🇰🇿|🇺🇦
+    proxies:
+      - Свободный интернет
+      - DIRECT
+
+  - name: Nintendo
+    type: select
+    icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Game.png
+    use:
+      - subscription
+    exclude-filter: 🇷🇺|🇰🇿|🇺🇦
+    proxies:
+      - Свободный интернет
+      - DIRECT
+
+  - name: OTHERS
+    type: select
+    icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Other.png
+    use:
+      - subscription
+    exclude-filter: 🇷🇺|🇰🇿|🇺🇦
     proxies:
       - Свободный интернет
       - DIRECT
@@ -216,6 +274,22 @@ rule-providers:
     path: ./rule-providers/tiktok-domains.mrs
     interval: 86400
 
+  playstation:
+    type: http
+    behavior: domain
+    format: mrs
+    url: https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/playstation.mrs
+    path: ./rule-providers/playstation-domains.mrs
+    interval: 86400
+
+  nintendo:
+    type: http
+    behavior: domain
+    format: mrs
+    url: https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/nintendo.mrs
+    path: ./rule-providers/nintendo-domains.mrs
+    interval: 86400
+
   community:
     type: http
     behavior: domain
@@ -294,13 +368,25 @@ rule-providers:
     path: ./rule-providers/torrent-clients.yaml
     interval: 86400
 
+  AI-custom:
+    type: file
+    behavior: classical
+    format: yaml
+    path: ./rules/AI.yaml
+
+  others:
+    type: file
+    behavior: classical
+    format: yaml
+    path: ./rules/others.yaml
+
 rules:
   - AND,((DST-PORT,443),(NETWORK,UDP)),QUIC
   - OR,((DOMAIN-SUFFIX,gql.twitch.tv),(DOMAIN-SUFFIX,usher.ttvnw.net)),Свободный интернет # Разблокировка высокого качества на Twitch.tv
   - GEOSITE,category-ai-!cn,AI
+  - RULE-SET,AI-custom,AI
   - GEOSITE,spotify,Spotify
   - OR,((GEOSITE,youtube),(DOMAIN-SUFFIX,googleusercontent.com)),YouTube
-  - OR,((DOMAIN,assistant-s3-pa.googleapis.com),(DOMAIN,androidwearcloudsync-pa.googleapis.com)),Свободный интернет
   - GEOSITE,twitch,Twitch
   - GEOSITE,twitter,Twitter
   - RULE-SET,discord,Discord
@@ -313,6 +399,9 @@ rules:
   - RULE-SET,patreon,Свободный интернет
   - RULE-SET,roblox,Roblox
   - RULE-SET,roblox-ips,Roblox
+  - RULE-SET,playstation,PlayStation
+  - RULE-SET,nintendo,Nintendo
+  - RULE-SET,others,OTHERS
   - RULE-SET,refilter-domains,Свободный интернет
   - RULE-SET,refilter-ips,Свободный интернет
   - RULE-SET,torrent-clients,DIRECT
