@@ -1,0 +1,18 @@
+# Mihoyo / HoYoverse (Genshin Impact, Honkai, Zenless Zone Zero и др.)
+# Политику задаёт RULE-SET,mihoyo,Mihoyo в config
+# behavior: classical, format: yaml
+payload:
+  - DOMAIN-SUFFIX,mihoyo.com
+  - DOMAIN-SUFFIX,hoyoverse.com
+  - DOMAIN-SUFFIX,hoyolab.com
+  - DOMAIN-SUFFIX,mihoyo.co
+  - DOMAIN-SUFFIX,hsr.hoyoverse.com
+  - DOMAIN-SUFFIX,api-os-takumi.mihoyo.com
+  - DOMAIN-SUFFIX,sdk-os-static.mihoyo.com
+  - DOMAIN-SUFFIX,bbs.mihoyo.com
+  - DOMAIN-SUFFIX,api-takumi.mihoyo.com
+  - DOMAIN-SUFFIX,api-takumi-record.mihoyo.com
+  - DOMAIN-SUFFIX,hk4e-api-os.mihoyo.com
+  - DOMAIN-SUFFIX,overseauspider.yuanshen.com
+  - DOMAIN-SUFFIX,yuanshen.com
+  - DOMAIN-SUFFIX,zenless.hoyoverse.com
