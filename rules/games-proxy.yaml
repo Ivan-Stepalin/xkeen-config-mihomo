@@ -1,0 +1,11 @@
+# Игры, которые некорректно работают в РФ — трафик через прокси (Свободный интернет)
+# Добавляй сюда домены по одному в формате: - DOMAIN-SUFFIX,example.com
+# Политику задаёт RULE-SET,games-proxy,Игры (прокси) в config.yaml
+# behavior: classical, format: yaml
+payload:
+  # Bungie: Marathon, Destiny
+  - DOMAIN-SUFFIX,bungie.net
+  - DOMAIN-SUFFIX,bungie.com
+  # ARC Raiders (Embark Studios)
+  - DOMAIN-SUFFIX,arcraiders.com
+  - DOMAIN-SUFFIX,embark-studios.com
