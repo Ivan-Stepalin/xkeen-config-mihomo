@@ -9,3 +9,5 @@ payload:
   # ARC Raiders (Embark Studios)
   - DOMAIN-SUFFIX,arcraiders.com
   - DOMAIN-SUFFIX,embark-studios.com
+  # Dead Orbit (signon и др.)
+  - DOMAIN-SUFFIX,deadorbit.net
