@@ -402,6 +402,14 @@ rule-providers:
     path: ./rule-providers/others.yaml
     interval: 86400
 
+  games-proxy:
+    type: http
+    behavior: classical
+    format: yaml
+    url: https://raw.githubusercontent.com/Ivan-Stepalin/xkeen-config-mihomo/main/rules/games-proxy.yaml
+    path: ./rule-providers/games-proxy.yaml
+    interval: 86400
+
 rules:
   - AND,((DST-PORT,443),(NETWORK,UDP)),QUIC
   - OR,((DOMAIN-SUFFIX,gql.twitch.tv),(DOMAIN-SUFFIX,usher.ttvnw.net)),Свободный интернет # Разблокировка высокого качества на Twitch.tv
@@ -424,6 +432,7 @@ rules:
   - RULE-SET,playstation,PlayStation
   - RULE-SET,nintendo,Nintendo
   - RULE-SET,mihoyo,Mihoyo
+  - RULE-SET,games-proxy,Свободный интернет
   - RULE-SET,others,OTHERS
   - RULE-SET,refilter-domains,Свободный интернет
   - RULE-SET,refilter-ips,Свободный интернет
