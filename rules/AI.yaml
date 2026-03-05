@@ -4,3 +4,4 @@
 payload:
   - OR,((DOMAIN,assistant-s3-pa.googleapis.com),(DOMAIN,androidwearcloudsync-pa.googleapis.com))
   - DOMAIN-SUFFIX,requestly.io
+  - DOMAIN-SUFFIX,gemini.google.com
