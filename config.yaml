@@ -32,7 +32,9 @@ proxy-groups:
   - name: Свободный интернет
     type: url-test
     url: http://www.msftncsi.com/ncsi.txt
-    interval: 600
+    interval: 120
+    tolerance: 50
+    lazy: false
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Available_1.png
     include-all: true
     exclude-filter: 🇷🇺|🇰🇿|🇺🇦
@@ -158,16 +160,6 @@ proxy-groups:
       - Свободный интернет
       - DIRECT
 
-  - name: Roblox
-    type: select
-    icon: https://github.com/amatol/xkeen-configuration/raw/refs/heads/main/group-icons/roblox.png
-    use:
-      - subscription
-    exclude-filter: 🇷🇺|🇰🇿|🇺🇦
-    proxies:
-      - Свободный интернет
-      - DIRECT
-
   - name: PlayStation
     type: select
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/PlayStation.png
@@ -258,22 +250,6 @@ rule-providers:
     format: mrs
     url: https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/patreon.mrs
     path: ./rule-providers/patreon-domains.mrs
-    interval: 86400
-
-  roblox:
-    type: http
-    behavior: domain
-    format: mrs
-    url: https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/roblox.mrs
-    path: ./rule-providers/roblox-domains.mrs
-    interval: 86400
-
-  roblox-ips:
-    type: http
-    behavior: ipcidr
-    format: mrs
-    url: https://github.com/amatol/xkeen-configuration/raw/refs/heads/main/rules/roblox-ips.mrs
-    path: ./rule-providers/roblox-ips.mrs
     interval: 86400
 
   tiktok:
@@ -427,8 +403,6 @@ rules:
   - RULE-SET,community,Community
   - RULE-SET,tiktok,TikTok
   - RULE-SET,patreon,Свободный интернет
-  - RULE-SET,roblox,Roblox
-  - RULE-SET,roblox-ips,Roblox
   - RULE-SET,playstation,PlayStation
   - RULE-SET,nintendo,Nintendo
   - RULE-SET,mihoyo,Mihoyo
