@@ -44,7 +44,6 @@ proxy-groups:
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/YouTube.png
     use:
       - subscription
-    exclude-filter: 🇷🇺|🇰🇿|🇺🇦
     proxies:
       - Свободный интернет
       - DIRECT
@@ -190,6 +189,16 @@ proxy-groups:
       - Свободный интернет
       - DIRECT
 
+  - name: Игры (прокси)
+    type: select
+    icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Game.png
+    use:
+      - subscription
+    exclude-filter: 🇷🇺|🇰🇿|🇺🇦
+    proxies:
+      - Свободный интернет
+      - DIRECT
+
   - name: OTHERS
     type: select
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Global.png
@@ -211,7 +220,7 @@ proxy-groups:
 proxy-providers:
   subscription:
     type: http
-    url: ${SUB_A}#  <------------ ЗДЕСЬ ВСТАВИТЬ ССЫЛКУ НА ВАШУ ПОДПИСКУ
+    url: ${SUB_C}#  <------------ ЗДЕСЬ ВСТАВИТЬ ССЫЛКУ НА ВАШУ ПОДПИСКУ
     path: ./proxy-providers/subscription.yaml
     interval: 3600
     health-check:
@@ -406,7 +415,7 @@ rules:
   - RULE-SET,playstation,PlayStation
   - RULE-SET,nintendo,Nintendo
   - RULE-SET,mihoyo,Mihoyo
-  - RULE-SET,games-proxy,Свободный интернет
+  - RULE-SET,games-proxy,Игры (прокси)
   - RULE-SET,others,OTHERS
   - RULE-SET,refilter-domains,Свободный интернет
   - RULE-SET,refilter-ips,Свободный интернет
