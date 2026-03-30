@@ -179,6 +179,56 @@ proxy-groups:
       - Свободный интернет
       - DIRECT
 
+  - name: Steam
+    type: select
+    icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Steam.png
+    use:
+      - subscription
+    exclude-filter: 🇷🇺|🇰🇿|🇺🇦
+    proxies:
+      - Свободный интернет
+      - DIRECT
+
+  - name: Steam (чат и голос)
+    type: select
+    icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Steam.png
+    use:
+      - subscription
+    exclude-filter: 🇷🇺|🇰🇿|🇺🇦
+    proxies:
+      - Свободный интернет
+      - DIRECT
+
+  - name: Epic Games
+    type: select
+    icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Epic_Games.png
+    use:
+      - subscription
+    exclude-filter: 🇷🇺|🇰🇿|🇺🇦
+    proxies:
+      - Свободный интернет
+      - DIRECT
+
+  - name: EA
+    type: select
+    icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Game.png
+    use:
+      - subscription
+    exclude-filter: 🇷🇺|🇰🇿|🇺🇦
+    proxies:
+      - Свободный интернет
+      - DIRECT
+
+  - name: Ubisoft
+    type: select
+    icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Game.png
+    use:
+      - subscription
+    exclude-filter: 🇷🇺|🇰🇿|🇺🇦
+    proxies:
+      - Свободный интернет
+      - DIRECT
+
   - name: Mihoyo
     type: select
     icon: https://raw.githubusercontent.com/clash-verge-rev/icon-hub/main/mihoyo/ys.png
@@ -284,6 +334,46 @@ rule-providers:
     url: https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/nintendo.mrs
     path: ./rule-providers/nintendo-domains.mrs
     interval: 86400
+
+  steam:
+    type: http
+    behavior: domain
+    format: mrs
+    url: https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/steam.mrs
+    path: ./rule-providers/steam-domains.mrs
+    interval: 86400
+
+  epicgames:
+    type: http
+    behavior: domain
+    format: mrs
+    url: https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/epicgames.mrs
+    path: ./rule-providers/epicgames-domains.mrs
+    interval: 86400
+
+  ea:
+    type: http
+    behavior: domain
+    format: mrs
+    url: https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/ea.mrs
+    path: ./rule-providers/ea-domains.mrs
+    interval: 86400
+
+  ubisoft:
+    type: http
+    behavior: domain
+    format: mrs
+    url: https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/ubisoft.mrs
+    path: ./rule-providers/ubisoft-domains.mrs
+    interval: 86400
+
+  steam-chat:
+    type: inline
+    behavior: classical
+    format: text
+    payload:
+      - DOMAIN-SUFFIX,steamcommunity.com
+      - DOMAIN-SUFFIX,steam-chat.com
 
   mihoyo:
     type: http
@@ -414,6 +504,11 @@ rules:
   - RULE-SET,patreon,Свободный интернет
   - RULE-SET,playstation,PlayStation
   - RULE-SET,nintendo,Nintendo
+  - RULE-SET,steam-chat,Steam (чат и голос)
+  - RULE-SET,steam,Steam
+  - RULE-SET,epicgames,Epic Games
+  - RULE-SET,ea,EA
+  - RULE-SET,ubisoft,Ubisoft
   - RULE-SET,mihoyo,Mihoyo
   - RULE-SET,games-proxy,Игры (прокси)
   - RULE-SET,others,OTHERS
