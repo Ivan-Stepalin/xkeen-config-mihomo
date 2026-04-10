@@ -270,7 +270,7 @@ proxy-groups:
 proxy-providers:
   subscription:
     type: http
-    url: ${SUB_C}#  <------------ ЗДЕСЬ ВСТАВИТЬ ССЫЛКУ НА ВАШУ ПОДПИСКУ
+    url:   <------------ ЗДЕСЬ ВСТАВИТЬ ССЫЛКУ НА ВАШУ ПОДПИСКУ
     path: ./proxy-providers/subscription.yaml
     interval: 3600
     health-check:
