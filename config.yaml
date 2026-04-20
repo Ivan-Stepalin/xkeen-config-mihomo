@@ -88,6 +88,16 @@ proxy-groups:
       - Свободный интернет
       - DIRECT
 
+  - name: Microsoft
+    type: select
+    icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Microsoft.png
+    use:
+      - subscription
+    exclude-filter: 🇷🇺|🇰🇿|🇺🇦
+    proxies:
+      - Свободный интернет
+      - DIRECT
+
   - name: Spotify
     type: select
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Spotify.png
@@ -319,6 +329,14 @@ rule-providers:
     path: ./rule-providers/tiktok-domains.mrs
     interval: 86400
 
+  microsoft:
+    type: http
+    behavior: domain
+    format: mrs
+    url: https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/microsoft.mrs
+    path: ./rule-providers/microsoft-domains.mrs
+    interval: 86400
+
   playstation:
     type: http
     behavior: domain
@@ -496,6 +514,7 @@ rules:
   - GEOSITE,twitter,Twitter
   - RULE-SET,discord,Discord
   - OR,((GEOSITE,meta),(RULE-SET,meta-ips,no-resolve)),Meta
+  - RULE-SET,microsoft,Microsoft
   - OR,((GEOSITE,telegram),(RULE-SET,telegram-ips,no-resolve)),Telegram
   - OR,((GEOSITE,cloudflare),(RULE-SET,cloudflare-ips)),Cloudflare
   - RULE-SET,kino,Кинотеатры
