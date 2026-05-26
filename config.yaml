@@ -189,6 +189,15 @@ proxy-groups:
       - Свободный интернет
       - DIRECT
 
+  - name: LG
+    type: select
+    icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Apple_TV.png
+    use:
+      - subscription
+    proxies:
+      - Свободный интернет
+      - DIRECT
+
   - name: Steam
     type: select
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Steam.png
@@ -280,7 +289,7 @@ proxy-groups:
 proxy-providers:
   subscription:
     type: http
-    url:   <------------ ЗДЕСЬ ВСТАВИТЬ ССЫЛКУ НА ВАШУ ПОДПИСКУ
+    url:  ${SUB_A}# <------------ ЗДЕСЬ ВСТАВИТЬ ССЫЛКУ НА ВАШУ ПОДПИСКУ
     path: ./proxy-providers/subscription.yaml
     interval: 3600
     health-check:
@@ -351,6 +360,14 @@ rule-providers:
     format: mrs
     url: https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/nintendo.mrs
     path: ./rule-providers/nintendo-domains.mrs
+    interval: 86400
+
+  lg:
+    type: http
+    behavior: classical
+    format: yaml
+    url: https://raw.githubusercontent.com/Ivan-Stepalin/xkeen-config-mihomo/main/rules/lg.yaml
+    path: ./rule-providers/lg.yaml
     interval: 86400
 
   steam:
@@ -523,6 +540,7 @@ rules:
   - RULE-SET,patreon,Свободный интернет
   - RULE-SET,playstation,PlayStation
   - RULE-SET,nintendo,Nintendo
+  - RULE-SET,lg,LG
   - RULE-SET,steam-chat,Steam (чат и голос)
   - RULE-SET,steam,Steam
   - RULE-SET,epicgames,Epic Games
