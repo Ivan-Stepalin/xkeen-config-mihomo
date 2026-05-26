@@ -540,7 +540,7 @@ rules:
   - RULE-SET,patreon,Свободный интернет
   - RULE-SET,playstation,PlayStation
   - RULE-SET,nintendo,Nintendo
-  - OR,((DOMAIN-SUFFIX,lgthinq.com),(DOMAIN-SUFFIX,lgwebostv.com),(DOMAIN-SUFFIX,lgsmartad.com),(RULE-SET,lg)),LG
+  - RULE-SET,lg,LG
   - RULE-SET,steam-chat,Steam (чат и голос)
   - RULE-SET,steam,Steam
   - RULE-SET,epicgames,Epic Games

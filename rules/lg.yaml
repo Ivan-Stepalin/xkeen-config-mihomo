@@ -2,17 +2,33 @@
 # Политику задаёт RULE-SET,lg,LG в config.yaml
 # behavior: classical, format: yaml
 payload:
+  # === Корпоративные сайты ===
   - DOMAIN,lgelectronics.122.2o7.net
   - DOMAIN-SUFFIX,lg.com
-  - DOMAIN-SUFFIX,lgappstv.com
   - DOMAIN-SUFFIX,lge.com
+  - DOMAIN-SUFFIX,lge.co.kr
   - DOMAIN-SUFFIX,lgecareers.com
   - DOMAIN-SUFFIX,lghvac.com
   - DOMAIN-SUFFIX,lghvacstory.com
   - DOMAIN-SUFFIX,lgrecyclingprogram.com
   - DOMAIN-SUFFIX,lgsalesportal.com
-  - DOMAIN-SUFFIX,lge.co.kr
+
+  # === webOS TV сервисы (Smart Platform / SDP) ===
+  - DOMAIN-SUFFIX,lgappstv.com
   - DOMAIN-SUFFIX,lgwebostv.com
+  - DOMAIN-SUFFIX,webostv.com
   - DOMAIN-SUFFIX,lgthinq.com
   - DOMAIN-SUFFIX,lgeapi.com
   - DOMAIN-SUFFIX,lgsmartad.com
+
+  # === Новые домены SDP (Smart Delivery Platform) — соглашения, EULA, account ===
+  - DOMAIN-SUFFIX,nextlgsdp.com
+  - DOMAIN-SUFFIX,lgtvsdp.com
+  - DOMAIN-SUFFIX,lgtvonline.com
+  - DOMAIN-SUFFIX,lgtvcommon.com
+
+  # === Реклама / телеметрия / контент LG Channels ===
+  - DOMAIN-SUFFIX,alphonso.tv
+  - DOMAIN-SUFFIX,lgad.cjpowercast.com
+  - DOMAIN-SUFFIX,lgcontent.alphonso.tv
+  - DOMAIN-SUFFIX,smartshare.lgtvsdp.com
