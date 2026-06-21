@@ -1,0 +1,12 @@
+# TCL Smart TV (Leiniao / 雷鸟) + Huan TV platform
+# Политику задаёт RULE-SET,tcl,TCL в config.yaml
+# behavior: classical, format: yaml
+payload:
+  # === Подтверждено по логам устройства 192.168.1.56 ===
+  - DOMAIN-SUFFIX,leiniao.com      # on-hweudc-o.api.leiniao.com, on-hw-tdp-o.api.leiniao.com
+  - DOMAIN-SUFFIX,huan.tv          # as-filter-upgrade.huan.tv
+
+  # === Корпоративные / облачные сервисы TCL ===
+  - DOMAIN-SUFFIX,tcl.com
+  - DOMAIN-SUFFIX,tclclouds.com
+  - DOMAIN-SUFFIX,ffalcon.tv       # FFalcon — TV-бренд TCL
