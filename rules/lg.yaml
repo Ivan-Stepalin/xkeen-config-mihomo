@@ -34,3 +34,11 @@ payload:
   - DOMAIN-SUFFIX,smartshare.lgtvsdp.com
 
   - DOMAIN-SUFFIX,www.ueiwsp.com
+
+  # 1. Дополнительные важные домены LG (включая IoT и конфигурацию)
+  - DOMAIN-SUFFIX,lgtviot.com,LG
+  - DOMAIN-SUFFIX,lgtvcommon.com,LG
+  
+  # 2. Перехват жестко зашитых IP-адресов LG (из вашего лога)
+  - IP-CIDR,31.192.109.0/24,LG
+  - IP-CIDR,80.239.138.0/24,LG
