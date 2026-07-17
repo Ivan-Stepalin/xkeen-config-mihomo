@@ -37,7 +37,7 @@ proxy-groups:
     lazy: false
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Available_1.png
     include-all: true
-    exclude-filter: 🇷🇺|🇰🇿|🇺🇦
+    
 
   - name: YouTube
     type: select
@@ -53,7 +53,7 @@ proxy-groups:
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Discord.png
     use:
       - subscription
-    exclude-filter: 🇷🇺|🇰🇿|🇺🇦
+    
     proxies:
       - Свободный интернет
       - DIRECT
@@ -63,7 +63,7 @@ proxy-groups:
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Twitch.png
     use:
       - subscription
-    exclude-filter: 🇷🇺|🇰🇿|🇺🇦
+    
     proxies:
       - Свободный интернет
       - DIRECT
@@ -73,7 +73,7 @@ proxy-groups:
     icon: https://github.com/amatol/xkeen-configuration/raw/refs/heads/main/group-icons/kino.png
     use:
       - subscription
-    exclude-filter: 🇷🇺|🇰🇿|🇺🇦
+    
     proxies:
       - Свободный интернет
       - DIRECT
@@ -83,7 +83,7 @@ proxy-groups:
     icon: https://github.com/zxc-rv/assets/raw/refs/heads/main/group-icons/meta.png
     use:
       - subscription
-    exclude-filter: 🇷🇺|🇰🇿|🇺🇦
+    
     proxies:
       - Свободный интернет
       - DIRECT
@@ -93,7 +93,7 @@ proxy-groups:
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Microsoft.png
     use:
       - subscription
-    exclude-filter: 🇷🇺|🇰🇿|🇺🇦
+    
     proxies:
       - Свободный интернет
       - DIRECT
@@ -103,7 +103,7 @@ proxy-groups:
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Spotify.png
     use:
       - subscription
-    exclude-filter: 🇷🇺|🇰🇿|🇺🇦
+    
     proxies:
       - Свободный интернет
       - DIRECT
@@ -113,7 +113,7 @@ proxy-groups:
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Telegram.png
     use:
       - subscription
-    exclude-filter: 🇷🇺|🇰🇿|🇺🇦
+    
     proxies:
       - Свободный интернет
       - DIRECT
@@ -123,7 +123,7 @@ proxy-groups:
     icon: https://github.com/amatol/xkeen-configuration/raw/refs/heads/main/group-icons/community.png
     use:
       - subscription
-    exclude-filter: 🇷🇺|🇰🇿|🇺🇦
+    
     proxies:
       - Свободный интернет
       - DIRECT
@@ -133,7 +133,7 @@ proxy-groups:
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Cloudflare.png
     use:
       - subscription
-    exclude-filter: 🇷🇺|🇰🇿|🇺🇦
+    
     proxies:
       - PASS
       - Свободный интернет
@@ -144,7 +144,7 @@ proxy-groups:
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Bot.png
     use:
       - subscription
-    exclude-filter: 🇷🇺|🇰🇿|🇺🇦
+    
     proxies:
       - Свободный интернет
       - DIRECT
@@ -154,7 +154,7 @@ proxy-groups:
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Twitter.png
     use:
       - subscription
-    exclude-filter: 🇷🇺|🇰🇿|🇺🇦
+    
     proxies:
       - Свободный интернет
       - DIRECT
@@ -164,7 +164,7 @@ proxy-groups:
     icon: https://github.com/amatol/xkeen-configuration/raw/refs/heads/main/group-icons/tiktok.png
     use:
       - subscription
-    exclude-filter: 🇷🇺|🇰🇿|🇺🇦
+    
     proxies:
       - Свободный интернет
       - DIRECT
@@ -174,7 +174,7 @@ proxy-groups:
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/PlayStation.png
     use:
       - subscription
-    exclude-filter: 🇷🇺|🇰🇿|🇺🇦
+    
     proxies:
       - Свободный интернет
       - DIRECT
@@ -184,7 +184,7 @@ proxy-groups:
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Nintendo.png
     use:
       - subscription
-    exclude-filter: 🇷🇺|🇰🇿|🇺🇦
+    
     proxies:
       - Свободный интернет
       - DIRECT
@@ -212,7 +212,7 @@ proxy-groups:
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Steam.png
     use:
       - subscription
-    exclude-filter: 🇷🇺|🇰🇿|🇺🇦
+    
     proxies:
       - Свободный интернет
       - DIRECT
@@ -222,7 +222,7 @@ proxy-groups:
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Steam.png
     use:
       - subscription
-    exclude-filter: 🇷🇺|🇰🇿|🇺🇦
+    
     proxies:
       - Свободный интернет
       - DIRECT
@@ -232,7 +232,7 @@ proxy-groups:
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Epic_Games.png
     use:
       - subscription
-    exclude-filter: 🇷🇺|🇰🇿|🇺🇦
+    
     proxies:
       - Свободный интернет
       - DIRECT
@@ -242,7 +242,7 @@ proxy-groups:
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Game.png
     use:
       - subscription
-    exclude-filter: 🇷🇺|🇰🇿|🇺🇦
+    
     proxies:
       - Свободный интернет
       - DIRECT
@@ -252,7 +252,7 @@ proxy-groups:
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Game.png
     use:
       - subscription
-    exclude-filter: 🇷🇺|🇰🇿|🇺🇦
+    
     proxies:
       - Свободный интернет
       - DIRECT
@@ -262,7 +262,7 @@ proxy-groups:
     icon: https://raw.githubusercontent.com/clash-verge-rev/icon-hub/main/mihoyo/ys.png
     use:
       - subscription
-    exclude-filter: 🇷🇺|🇰🇿|🇺🇦
+    
     proxies:
       - Свободный интернет
       - DIRECT
@@ -272,7 +272,7 @@ proxy-groups:
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Game.png
     use:
       - subscription
-    exclude-filter: 🇷🇺|🇰🇿|🇺🇦
+    
     proxies:
       - Свободный интернет
       - DIRECT
@@ -282,7 +282,7 @@ proxy-groups:
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Global.png
     use:
       - subscription
-    exclude-filter: 🇷🇺|🇰🇿|🇺🇦
+    
     proxies:
       - Свободный интернет
       - DIRECT
