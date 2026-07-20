@@ -12,3 +12,6 @@ payload:
   - DOMAIN-SUFFIX,daily-cloudcode-pa.googleapis.com
   - DOMAIN-SUFFIX,gstatic.com
   - DOMAIN-KEYWORD,alkali
+  - DOMAIN-SUFFIX,optimizationguide-pa.googleapis.com
+  - DOMAIN-SUFFIX,clients4.google.com
+  - DOMAIN-SUFFIX,goog
