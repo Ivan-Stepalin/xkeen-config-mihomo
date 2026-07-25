@@ -16,3 +16,13 @@ payload:
     - media.themoviedb.org
     - '+.tmdb.org'
     - tmdb-image-prod.b-cdn.net
+    # Lampa: зеркала CUB, поддомен apitmdb.* проксирует TMDB API
+    - '+.cub.rip'
+    - '+.cubnotrip.top'
+    - '+.durex.monster'
+    - '+.kurwa-bober.ninja'
+    - '+.nackhui.com'
+    - '+.cub.red'
+    # Lampa: зеркала картинок TMDB и резервный прокси
+    - '+.imagetmdb.com'
+    - lampa.byskaz.ru
