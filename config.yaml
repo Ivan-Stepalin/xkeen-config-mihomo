@@ -326,9 +326,9 @@ rule-providers:
   kino:
     type: http
     behavior: domain
-    format: mrs
-    url: https://github.com/amatol/xkeen-configuration/raw/refs/heads/main/rules/kino.mrs
-    path: ./rule-providers/kino-domains.mrs
+    format: yaml
+    url: https://raw.githubusercontent.com/Ivan-Stepalin/xkeen-config-mihomo/main/rules/kino.yaml
+    path: ./rule-providers/kino-domains.yaml
     interval: 86400
 
   patreon:
