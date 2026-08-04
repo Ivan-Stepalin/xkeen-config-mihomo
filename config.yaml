@@ -556,6 +556,7 @@ rules:
   - RULE-SET,tiktok,TikTok
   - RULE-SET,patreon,Свободный интернет
   - RULE-SET,playstation,PlayStation
+  - IP-CIDR,172.235.195.23/32,Nintendo,no-resolve
   - RULE-SET,nintendo,Nintendo
   - RULE-SET,lg,LG
   - RULE-SET,tcl,TCL
