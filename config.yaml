@@ -552,12 +552,12 @@ rules:
   - OR,((GEOSITE,telegram),(RULE-SET,telegram-ips,no-resolve)),Telegram
   - OR,((GEOSITE,cloudflare),(RULE-SET,cloudflare-ips)),Cloudflare
   - RULE-SET,kino,Кинотеатры
+  - IP-CIDR,172.235.195.23/32,Nintendo,no-resolve
+  - RULE-SET,nintendo,Nintendo
   - RULE-SET,community,Community
   - RULE-SET,tiktok,TikTok
   - RULE-SET,patreon,Свободный интернет
   - RULE-SET,playstation,PlayStation
-  - IP-CIDR,172.235.195.23/32,Nintendo,no-resolve
-  - RULE-SET,nintendo,Nintendo
   - RULE-SET,lg,LG
   - RULE-SET,tcl,TCL
   - RULE-SET,steam-chat,Steam (чат и голос)
