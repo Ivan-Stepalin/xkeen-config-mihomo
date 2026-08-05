@@ -28,7 +28,74 @@ sniffer:
     TLS:
       ports: [443, 8443]
 
+# ══════════════════════════════════════════════════════════════════════
+# ШАБЛОНЫ
+#
+# Ключ x-templates mihomo не читает — он существует только как источник
+# YAML-якорей для блоков ниже. Повторяющиеся поля описаны здесь один раз,
+# а группы и rule-provider'ы подключают их через merge-ключ `<<: *якорь`.
+# Любое поле после `<<:` переопределяет унаследованное значение.
+#
+# Как добавить группу:      см. комментарий над proxy-groups
+# Как добавить rule-provider: см. комментарий над rule-providers
+# ══════════════════════════════════════════════════════════════════════
+x-templates:
+  # Группа: узлы из подписки + ручной выбор запасных вариантов.
+  select: &select
+    type: select
+    use: [subscription]
+    proxies: [Свободный интернет, DIRECT]
+
+  # rule-provider: скомпилированный .mrs со списком доменов.
+  mrs-domain: &mrs-domain
+    type: http
+    behavior: domain
+    format: mrs
+    interval: 86400
+
+  # rule-provider: скомпилированный .mrs со списком IP-подсетей.
+  mrs-ipcidr: &mrs-ipcidr
+    type: http
+    behavior: ipcidr
+    format: mrs
+    interval: 86400
+
+  # rule-provider: .yaml, плоский список доменов (payload: - example.com).
+  yaml-domain: &yaml-domain
+    type: http
+    behavior: domain
+    format: yaml
+    interval: 86400
+
+  # rule-provider: .yaml, полноценные правила (payload: - DOMAIN-SUFFIX,…).
+  yaml-classical: &yaml-classical
+    type: http
+    behavior: classical
+    format: yaml
+    interval: 86400
+
+  # rule-provider: правила прямо в этом файле, без загрузки.
+  inline: &inline
+    type: inline
+    behavior: classical
+    format: text
+
+# ══════════════════════════════════════════════════════════════════════
+# ГРУППЫ
+#
+# Новая группа — три строки:
+#
+#   - <<: *select
+#     name: Название
+#     icon: https://…/icon.png
+#
+# Название затем указывается как цель правила в блоке rules.
+# Чтобы изменить список запасных вариантов, допишите своё поле proxies —
+# оно перекроет значение из шаблона (пример: Cloudflare ниже).
+# ══════════════════════════════════════════════════════════════════════
 proxy-groups:
+  # Автовыбор быстрейшего узла подписки. Используется как «прокси по
+  # умолчанию» в шаблоне *select, поэтому объявлен первым.
   - name: Свободный интернет
     type: url-test
     url: http://www.msftncsi.com/ncsi.txt
@@ -37,262 +104,115 @@ proxy-groups:
     lazy: false
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Available_1.png
     include-all: true
-    
 
-  - name: YouTube
-    type: select
+  - <<: *select
+    name: YouTube
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/YouTube.png
-    use:
-      - subscription
-    proxies:
-      - Свободный интернет
-      - DIRECT
 
-  - name: Discord
-    type: select
+  - <<: *select
+    name: Discord
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Discord.png
-    use:
-      - subscription
-    
-    proxies:
-      - Свободный интернет
-      - DIRECT
 
-  - name: Twitch
-    type: select
+  - <<: *select
+    name: Twitch
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Twitch.png
-    use:
-      - subscription
-    
-    proxies:
-      - Свободный интернет
-      - DIRECT
 
-  - name: Кинотеатры
-    type: select
+  - <<: *select
+    name: Кинотеатры
     icon: https://github.com/amatol/xkeen-configuration/raw/refs/heads/main/group-icons/kino.png
-    use:
-      - subscription
-    
-    proxies:
-      - Свободный интернет
-      - DIRECT
 
-  - name: Meta
-    type: select
+  - <<: *select
+    name: Meta
     icon: https://github.com/zxc-rv/assets/raw/refs/heads/main/group-icons/meta.png
-    use:
-      - subscription
-    
-    proxies:
-      - Свободный интернет
-      - DIRECT
 
-  - name: Microsoft
-    type: select
+  - <<: *select
+    name: Microsoft
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Microsoft.png
-    use:
-      - subscription
-    
-    proxies:
-      - Свободный интернет
-      - DIRECT
 
-  - name: Spotify
-    type: select
+  - <<: *select
+    name: Spotify
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Spotify.png
-    use:
-      - subscription
-    
-    proxies:
-      - Свободный интернет
-      - DIRECT
 
-  - name: Telegram
-    type: select
+  - <<: *select
+    name: Telegram
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Telegram.png
-    use:
-      - subscription
-    
-    proxies:
-      - Свободный интернет
-      - DIRECT
 
-  - name: Community
-    type: select
+  - <<: *select
+    name: Community
     icon: https://github.com/amatol/xkeen-configuration/raw/refs/heads/main/group-icons/community.png
-    use:
-      - subscription
-    
-    proxies:
-      - Свободный интернет
-      - DIRECT
 
-  - name: Cloudflare
-    type: select
+  # PASS — передать решение следующему правилу вместо отправки в прокси.
+  - <<: *select
+    name: Cloudflare
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Cloudflare.png
-    use:
-      - subscription
-    
-    proxies:
-      - PASS
-      - Свободный интернет
-      - DIRECT
+    proxies: [PASS, Свободный интернет, DIRECT]
 
-  - name: AI
-    type: select
+  - <<: *select
+    name: AI
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Bot.png
-    use:
-      - subscription
-    
-    proxies:
-      - Свободный интернет
-      - DIRECT
 
-  - name: Twitter
-    type: select
+  - <<: *select
+    name: Twitter
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Twitter.png
-    use:
-      - subscription
-    
-    proxies:
-      - Свободный интернет
-      - DIRECT
 
-  - name: TikTok
-    type: select
+  - <<: *select
+    name: TikTok
     icon: https://github.com/amatol/xkeen-configuration/raw/refs/heads/main/group-icons/tiktok.png
-    use:
-      - subscription
-    
-    proxies:
-      - Свободный интернет
-      - DIRECT
 
-  - name: PlayStation
-    type: select
+  - <<: *select
+    name: PlayStation
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/PlayStation.png
-    use:
-      - subscription
-    
-    proxies:
-      - Свободный интернет
-      - DIRECT
 
-  - name: Nintendo
-    type: select
+  - <<: *select
+    name: Nintendo
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Nintendo.png
-    use:
-      - subscription
-    
-    proxies:
-      - Свободный интернет
-      - DIRECT
 
-  - name: LG
-    type: select
+  - <<: *select
+    name: LG
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Apple_TV.png
-    use:
-      - subscription
-    proxies:
-      - Свободный интернет
-      - DIRECT
 
-  - name: TCL
-    type: select
+  - <<: *select
+    name: TCL
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Apple_TV.png
-    use:
-      - subscription
-    proxies:
-      - Свободный интернет
-      - DIRECT
 
-  - name: Steam
-    type: select
+  - <<: *select
+    name: Steam
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Steam.png
-    use:
-      - subscription
-    
-    proxies:
-      - Свободный интернет
-      - DIRECT
 
-  - name: Steam (чат и голос)
-    type: select
+  - <<: *select
+    name: Steam (чат и голос)
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Steam.png
-    use:
-      - subscription
-    
-    proxies:
-      - Свободный интернет
-      - DIRECT
 
-  - name: Epic Games
-    type: select
+  - <<: *select
+    name: Epic Games
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Epic_Games.png
-    use:
-      - subscription
-    
-    proxies:
-      - Свободный интернет
-      - DIRECT
 
-  - name: EA
-    type: select
+  - <<: *select
+    name: EA
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Game.png
-    use:
-      - subscription
-    
-    proxies:
-      - Свободный интернет
-      - DIRECT
 
-  - name: Ubisoft
-    type: select
+  - <<: *select
+    name: Ubisoft
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Game.png
-    use:
-      - subscription
-    
-    proxies:
-      - Свободный интернет
-      - DIRECT
 
-  - name: Mihoyo
-    type: select
+  - <<: *select
+    name: Mihoyo
     icon: https://raw.githubusercontent.com/clash-verge-rev/icon-hub/main/mihoyo/ys.png
-    use:
-      - subscription
-    
-    proxies:
-      - Свободный интернет
-      - DIRECT
 
-  - name: Игры (прокси)
-    type: select
+  - <<: *select
+    name: Игры (прокси)
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Game.png
-    use:
-      - subscription
-    
-    proxies:
-      - Свободный интернет
-      - DIRECT
 
-  - name: OTHERS
-    type: select
+  - <<: *select
+    name: OTHERS
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Global.png
-    use:
-      - subscription
-    
-    proxies:
-      - Свободный интернет
-      - DIRECT
 
+  # Служебная группа: глушит QUIC, чтобы трафик откатился на TLS.
+  # Без `use`, поэтому шаблон *select не подходит.
   - name: QUIC
     type: select
     icon: https://github.com/zxc-rv/assets/raw/refs/heads/main/group-icons/quic.png
-    proxies:
-      - REJECT
-      - PASS
+    proxies: [REJECT, PASS]
 
 # Подключение с использованием подписки
 proxy-providers:
@@ -306,155 +226,164 @@ proxy-providers:
       url: http://www.msftncsi.com/ncsi.txt
       interval: 120
 
+# ══════════════════════════════════════════════════════════════════════
+# RULE-PROVIDER'Ы
+#
+# Новый провайдер — четыре строки (шаблон задаёт type/behavior/format/interval):
+#
+#   имя:
+#     <<: *mrs-domain
+#     url: https://…/что-то.mrs
+#     path: ./rule-providers/что-то.mrs
+#
+# Шаблон выбирается по формату источника:
+#   *mrs-domain      .mrs со списком доменов
+#   *mrs-ipcidr      .mrs со списком IP-подсетей
+#   *yaml-domain     .yaml, плоский список доменов
+#   *yaml-classical  .yaml с готовыми правилами
+#   *inline          правила прямо здесь, в payload
+#
+# Имя провайдера — то, что пишется в RULE-SET,<имя>,<группа>.
+# ══════════════════════════════════════════════════════════════════════
 rule-providers:
-  refilter-domains:
-    type: http
-    behavior: domain
-    format: mrs
-    url: https://github.com/legiz-ru/mihomo-rule-sets/raw/main/re-filter/domain-rule.mrs
-    path: ./rule-providers/refilter-domains.mrs
-    interval: 86400
-
-  refilter-ips:
-    type: http
-    behavior: ipcidr
-    format: mrs
-    url: https://github.com/legiz-ru/mihomo-rule-sets/raw/main/re-filter/ip-rule.mrs
-    path: ./rule-providers/refilter-ips.mrs
-    interval: 86400
-
+  # ── Собственные списки из этого репозитория ───────────────────────
+  # Правятся в rules/*.yaml, роутер подтягивает их с raw.githubusercontent.
+  # После push изменения приезжают в течение interval (сутки).
   kino:
-    type: http
-    behavior: domain
-    format: yaml
+    <<: *yaml-domain
     url: https://raw.githubusercontent.com/Ivan-Stepalin/xkeen-config-mihomo/main/rules/kino.yaml
     path: ./rule-providers/kino-domains.yaml
-    interval: 86400
 
-  patreon:
-    type: http
-    behavior: domain
-    format: mrs
-    url: https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/patreon.mrs
-    path: ./rule-providers/patreon-domains.mrs
-    interval: 86400
-
-  tiktok:
-    type: http
-    behavior: domain
-    format: mrs
-    url: https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/tiktok.mrs
-    path: ./rule-providers/tiktok-domains.mrs
-    interval: 86400
-
-  microsoft:
-    type: http
-    behavior: domain
-    format: mrs
-    url: https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/microsoft.mrs
-    path: ./rule-providers/microsoft-domains.mrs
-    interval: 86400
-
-  playstation:
-    type: http
-    behavior: domain
-    format: mrs
-    url: https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/playstation.mrs
-    path: ./rule-providers/playstation-domains.mrs
-    interval: 86400
-
-  nintendo:
-    type: http
-    behavior: domain
-    format: mrs
-    url: https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/nintendo.mrs
-    path: ./rule-providers/nintendo-domains.mrs
-    interval: 86400
+  AI-custom:
+    <<: *yaml-classical
+    url: https://raw.githubusercontent.com/Ivan-Stepalin/xkeen-config-mihomo/main/rules/AI.yaml
+    path: ./rule-providers/ai-custom.yaml
 
   lg:
-    type: http
-    behavior: classical
-    format: yaml
+    <<: *yaml-classical
     url: https://raw.githubusercontent.com/Ivan-Stepalin/xkeen-config-mihomo/main/rules/lg.yaml
     path: ./rule-providers/lg.yaml
-    interval: 86400
 
   tcl:
-    type: http
-    behavior: classical
-    format: yaml
+    <<: *yaml-classical
     url: https://raw.githubusercontent.com/Ivan-Stepalin/xkeen-config-mihomo/main/rules/tcl.yaml
     path: ./rule-providers/tcl.yaml
-    interval: 86400
+
+  mihoyo:
+    <<: *yaml-classical
+    url: https://raw.githubusercontent.com/Ivan-Stepalin/xkeen-config-mihomo/main/rules/mihoyo.yaml
+    path: ./rule-providers/mihoyo.yaml
+
+  others:
+    <<: *yaml-classical
+    url: https://raw.githubusercontent.com/Ivan-Stepalin/xkeen-config-mihomo/main/rules/others.yaml
+    path: ./rule-providers/others.yaml
+
+  games-proxy:
+    <<: *yaml-classical
+    url: https://raw.githubusercontent.com/Ivan-Stepalin/xkeen-config-mihomo/main/rules/games-proxy.yaml
+    path: ./rule-providers/games-proxy.yaml
+
+  # ВНИМАНИЕ: тянется .mrs, а не rules/community.yaml — правки в yaml
+  # ни на что не влияют, пока источник не переведён на format: yaml.
+  # Подробнее: scripts/validate.rb предупреждает об этом рассинхроне.
+  community:
+    <<: *mrs-domain
+    url: https://raw.githubusercontent.com/Ivan-Stepalin/xkeen-config-mihomo/main/rules/community.mrs
+    path: ./rule-providers/community-domains.mrs
+
+  # ── geosite от MetaCubeX ──────────────────────────────────────────
+  patreon:
+    <<: *mrs-domain
+    url: https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/patreon.mrs
+    path: ./rule-providers/patreon-domains.mrs
+
+  tiktok:
+    <<: *mrs-domain
+    url: https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/tiktok.mrs
+    path: ./rule-providers/tiktok-domains.mrs
+
+  microsoft:
+    <<: *mrs-domain
+    url: https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/microsoft.mrs
+    path: ./rule-providers/microsoft-domains.mrs
+
+  playstation:
+    <<: *mrs-domain
+    url: https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/playstation.mrs
+    path: ./rule-providers/playstation-domains.mrs
+
+  nintendo:
+    <<: *mrs-domain
+    url: https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/nintendo.mrs
+    path: ./rule-providers/nintendo-domains.mrs
 
   steam:
-    type: http
-    behavior: domain
-    format: mrs
+    <<: *mrs-domain
     url: https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/steam.mrs
     path: ./rule-providers/steam-domains.mrs
-    interval: 86400
 
   epicgames:
-    type: http
-    behavior: domain
-    format: mrs
+    <<: *mrs-domain
     url: https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/epicgames.mrs
     path: ./rule-providers/epicgames-domains.mrs
-    interval: 86400
 
   ea:
-    type: http
-    behavior: domain
-    format: mrs
+    <<: *mrs-domain
     url: https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/ea.mrs
     path: ./rule-providers/ea-domains.mrs
-    interval: 86400
 
   ubisoft:
-    type: http
-    behavior: domain
-    format: mrs
+    <<: *mrs-domain
     url: https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/ubisoft.mrs
     path: ./rule-providers/ubisoft-domains.mrs
-    interval: 86400
 
+  # ── geoip от MetaCubeX и сторонние IP-списки ──────────────────────
+  cloudflare-ips:
+    <<: *mrs-ipcidr
+    url: https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geoip/cloudflare.mrs
+    path: ./rule-providers/cloudflare-ips.mrs
+
+  telegram-ips:
+    <<: *mrs-ipcidr
+    url: https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geoip/telegram.mrs
+    path: ./rule-providers/telegram-ips.mrs
+
+  meta-ips:
+    <<: *mrs-ipcidr
+    url: https://github.com/zxc-rv/assets/raw/refs/heads/main/rules/meta-ips.mrs
+    path: ./rule-providers/meta-ips.mrs
+
+  # ── re:filter (реестр РКН) и торренты, legiz-ru ───────────────────
+  refilter-domains:
+    <<: *mrs-domain
+    url: https://github.com/legiz-ru/mihomo-rule-sets/raw/main/re-filter/domain-rule.mrs
+    path: ./rule-providers/refilter-domains.mrs
+
+  refilter-ips:
+    <<: *mrs-ipcidr
+    url: https://github.com/legiz-ru/mihomo-rule-sets/raw/main/re-filter/ip-rule.mrs
+    path: ./rule-providers/refilter-ips.mrs
+
+  torrent-trackers:
+    <<: *mrs-domain
+    url: https://github.com/legiz-ru/mihomo-rule-sets/raw/main/other/torrent-trackers.mrs
+    path: ./rule-providers/torrent-trackers.mrs
+
+  torrent-clients:
+    <<: *yaml-classical
+    url: https://github.com/legiz-ru/mihomo-rule-sets/raw/main/other/torrent-clients.yaml
+    path: ./rule-providers/torrent-clients.yaml
+
+  # ── Правила, заданные прямо здесь ─────────────────────────────────
   steam-chat:
-    type: inline
-    behavior: classical
-    format: text
+    <<: *inline
     payload:
       - DOMAIN-SUFFIX,steamcommunity.com
       - DOMAIN-SUFFIX,steam-chat.com
 
-  mihoyo:
-    type: http
-    behavior: classical
-    format: yaml
-    url: https://raw.githubusercontent.com/Ivan-Stepalin/xkeen-config-mihomo/main/rules/mihoyo.yaml
-    path: ./rule-providers/mihoyo.yaml
-    interval: 86400
-
-  community:
-    type: http
-    behavior: domain
-    format: mrs
-    url: https://raw.githubusercontent.com/Ivan-Stepalin/xkeen-config-mihomo/main/rules/community.mrs
-    path: ./rule-providers/community-domains.mrs
-    interval: 86400
-
-  cloudflare-ips:
-    type: http
-    behavior: ipcidr
-    format: mrs
-    url: https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geoip/cloudflare.mrs
-    path: ./rule-providers/cloudflare-ips.mrs
-    interval: 86400
-
   discord:
-    type: inline
-    behavior: classical
-    format: text
+    <<: *inline
     payload:
       - AND,((DOMAIN-KEYWORD,discord),(NOT,((DOMAIN-SUFFIX,ru))))
       - AND,((RULE-SET,cloudflare-ips,no-resolve),(NETWORK,TCP),(OR,((DST-PORT,2000-2300),(DST-PORT,8443))))
@@ -466,77 +395,15 @@ rule-providers:
       - AND,((IP-CIDR,66.22.192.0/18,no-resolve),(NETWORK,UDP),(DST-PORT,50000-51000))
       - AND,((IP-CIDR,138.128.136.0/21,no-resolve),(NETWORK,UDP),(DST-PORT,50000-51000))
 
-  telegram-ips:
-    type: http
-    behavior: ipcidr
-    format: mrs
-    url: https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geoip/telegram.mrs
-    path: ./rule-providers/telegram-ips.mrs
-    interval: 86400
-
-  meta-ips:
-    type: http
-    behavior: ipcidr
-    format: mrs
-    url: https://github.com/zxc-rv/assets/raw/refs/heads/main/rules/meta-ips.mrs
-    path: ./rule-providers/meta-ips.mrs
-    interval: 86400
-
-  refilter-noech:
-    type: http
-    behavior: domain
-    format: mrs
-    url: https://github.com/legiz-ru/mihomo-rule-sets/raw/main/re-filter/re-filter-noech.mrs
-    path: ./rule-providers/refilter-noech.mrs
-    interval: 86400
-
-  refilter-ech:
-    type: http
-    behavior: domain
-    format: mrs
-    url: https://github.com/legiz-ru/mihomo-rule-sets/raw/main/re-filter/re-filter-ech.mrs
-    path: ./rule-providers/refilter-ech.mrs
-    interval: 86400
-
-  torrent-trackers:
-    type: http
-    behavior: domain
-    format: mrs
-    url: https://github.com/legiz-ru/mihomo-rule-sets/raw/main/other/torrent-trackers.mrs
-    path: ./rule-providers/torrent-trackers.mrs
-
-  torrent-clients:
-    type: http
-    behavior: classical
-    format: yaml
-    url: https://github.com/legiz-ru/mihomo-rule-sets/raw/main/other/torrent-clients.yaml
-    path: ./rule-providers/torrent-clients.yaml
-    interval: 86400
-
-  AI-custom:
-    type: http
-    behavior: classical
-    format: yaml
-    url: https://raw.githubusercontent.com/Ivan-Stepalin/xkeen-config-mihomo/main/rules/AI.yaml
-    path: ./rule-providers/ai-custom.yaml
-    interval: 86400
-
-  others:
-    type: http
-    behavior: classical
-    format: yaml
-    url: https://raw.githubusercontent.com/Ivan-Stepalin/xkeen-config-mihomo/main/rules/others.yaml
-    path: ./rule-providers/others.yaml
-    interval: 86400
-
-  games-proxy:
-    type: http
-    behavior: classical
-    format: yaml
-    url: https://raw.githubusercontent.com/Ivan-Stepalin/xkeen-config-mihomo/main/rules/games-proxy.yaml
-    path: ./rule-providers/games-proxy.yaml
-    interval: 86400
-
+# ══════════════════════════════════════════════════════════════════════
+# ПРАВИЛА
+#
+# ПОРЯДОК ЗНАЧИМ: побеждает первое совпадение, остальные не проверяются.
+# Узкое правило должно стоять выше широкого, иначе широкое его перекроет
+# (так nintendo-домены больше года уходили в Community вместо Nintendo).
+#
+# Проверить порядок и ссылки: ruby scripts/validate.rb
+# ══════════════════════════════════════════════════════════════════════
 rules:
   - AND,((DST-PORT,443),(NETWORK,UDP)),QUIC
   - OR,((DOMAIN-SUFFIX,gql.twitch.tv),(DOMAIN-SUFFIX,usher.ttvnw.net)),Свободный интернет # Разблокировка высокого качества на Twitch.tv
