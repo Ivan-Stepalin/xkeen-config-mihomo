@@ -1,1 +1,7 @@
 .DS_Store
+# Реальные ссылки подписок — подставляются в config.yaml smudge-фильтром.
+.secrets.yaml
+# Кэш подписок: mihomo перезаписывает его сам, версионировать нечего,
+# а внутри лежат узлы с UUID.
+proxy-providers/*.yaml
+proxy-providers/*.url
