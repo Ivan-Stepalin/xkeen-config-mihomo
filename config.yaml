@@ -40,11 +40,29 @@ sniffer:
 # Как добавить rule-provider: см. комментарий над rule-providers
 # ══════════════════════════════════════════════════════════════════════
 x-templates:
-  # Группа: узлы из подписки + ручной выбор запасных вариантов.
+  # Группа: узлы обеих подписок + ручной выбор запасных вариантов.
   select: &select
     type: select
-    use: [subscription]
-    proxies: [Свободный интернет, DIRECT]
+    use: [subscription, subscription2]
+    proxies: [Свободный интернет, Подписка A, Подписка B, DIRECT]
+
+  # Подписка: общие поля, различаются только url, path и префикс имён.
+  provider: &provider
+    type: http
+    interval: 3600
+    health-check:
+      enable: true
+      url: http://www.msftncsi.com/ncsi.txt
+      interval: 120
+
+  # Группа: автовыбор быстрейшего узла внутри одной подписки.
+  # Без lazy: false — узлы тестируются только когда группа реально выбрана,
+  # иначе роутер гонял бы health-check по всем узлам обеих подписок втройне.
+  sub-test: &sub-test
+    type: url-test
+    url: http://www.msftncsi.com/ncsi.txt
+    interval: 120
+    tolerance: 50
 
   # rule-provider: скомпилированный .mrs со списком доменов.
   mrs-domain: &mrs-domain
@@ -104,6 +122,24 @@ proxy-groups:
     lazy: false
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Available_1.png
     include-all: true
+    # Семейство nv — самое быстрое, поэтому url-test выбирал именно его, и на
+    # него садились все сервисы Google, кроме группы AI. Google блокирует эти
+    # IP (петля GOOGLE_ABUSE), из-за чего Gemini падал на заглушку про страну
+    # уже после загрузки страницы. Российские выходы исключены по той же
+    # причине. Узлы остаются доступны для выбора вручную в любой группе.
+    exclude-filter: "(?i)(nv [0-9]|\U0001F1F7\U0001F1FA)"
+
+  # Автовыбор внутри одной подписки: «идти только через A» / «только через B».
+  # Доступны как вариант в каждой группе ниже — см. proxies в шаблоне *select.
+  - <<: *sub-test
+    name: Подписка A
+    use: [subscription]
+    icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Server.png
+
+  - <<: *sub-test
+    name: Подписка B
+    use: [subscription2]
+    icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Round_Robin.png
 
   - <<: *select
     name: YouTube
@@ -145,11 +181,37 @@ proxy-groups:
   - <<: *select
     name: Cloudflare
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Cloudflare.png
-    proxies: [PASS, Свободный интернет, DIRECT]
+    proxies: [PASS, Свободный интернет, Подписка A, Подписка B, DIRECT]
+
+  # Google блокирует часть узлов подписки по IP: вместо чата Gemini они
+  # отдают петлю редиректов на GOOGLE_ABUSE_EXEMPTION, и страница показывает
+  # заглушку «Gemini пока не поддерживается в вашей стране». Проверено
+  # 26.08.2026: семейство nv блокируется, узлы d/dt/st 2/France/Poland и
+  # немецкие из подписки B — работают. Поэтому у AI свой автовыбор, из
+  # которого nv и российские выходы исключены.
+  # fallback, а не url-test: url-test гонится за скоростью и переключал бы
+  # узел каждые 120 секунд прямо посреди диалога — для Google это смена
+  # страны в рамках одной сессии и повод снова показать заглушку.
+  # fallback держится за один узел, пока он жив.
+  - name: AI-выход
+    type: fallback
+    url: http://www.msftncsi.com/ncsi.txt
+    interval: 120
+    use: [subscription, subscription2]
+    # Белый список, а не чёрный. Google относит IP к странам по своей базе,
+    # и почти вся подписка помечена у него как RU независимо от того, где
+    # сервер стоит физически: проверено 26.08.2026 перебором всех живых
+    # узлов — 43 из 54 Google считает российскими. Здесь перечислены те,
+    # на которых Google отдаёт нероссийскую локаль (pl / nl / en) и Gemini
+    # грузится целиком. Проверять так: запрос на www.google.com через узел,
+    # в ответе не должно быть ">Россия<" и hl=ru.
+    filter: "(?i)(Poland n[3467]|Netherlands Lt 1|India|Singapore)"
+    icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Bot.png
 
   - <<: *select
     name: AI
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Bot.png
+    proxies: [AI-выход, Свободный интернет, Подписка A, Подписка B, DIRECT]
 
   - <<: *select
     name: Twitter
@@ -214,17 +276,31 @@ proxy-groups:
     icon: https://github.com/zxc-rv/assets/raw/refs/heads/main/group-icons/quic.png
     proxies: [REJECT, PASS]
 
-# Подключение с использованием подписки
+# ══════════════════════════════════════════════════════════════════════
+# ПОДПИСКИ
+#
+# Обе подключены одновременно: узлы обеих видны во всех группах, а группы
+# «Подписка A» / «Подписка B» дают выбор конкретной подписки.
+#
+#   path             обязан быть разным, иначе провайдеры перезапишут
+#                    файл друг друга;
+#   additional-prefix помечает узлы «[A] » / «[B] », чтобы имена из разных
+#                    подписок не столкнулись и было видно происхождение.
+# ══════════════════════════════════════════════════════════════════════
 proxy-providers:
   subscription:
-    type: http
-    url:  ${SUB_A}# <------------ ЗДЕСЬ ВСТАВИТЬ ССЫЛКУ НА ВАШУ ПОДПИСКУ
+    <<: *provider
+    url: ${SUB_A}
     path: ./proxy-providers/subscription.yaml
-    interval: 3600
-    health-check:
-      enable: true
-      url: http://www.msftncsi.com/ncsi.txt
-      interval: 120
+    override:
+      additional-prefix: "[A] "
+
+  subscription2:
+    <<: *provider
+    url: ${SUB_B}
+    path: ./proxy-providers/subscription2.yaml
+    override:
+      additional-prefix: "[B] "
 
 # ══════════════════════════════════════════════════════════════════════
 # RULE-PROVIDER'Ы
@@ -409,8 +485,25 @@ rules:
   - OR,((DOMAIN-SUFFIX,gql.twitch.tv),(DOMAIN-SUFFIX,usher.ttvnw.net)),Свободный интернет # Разблокировка высокого качества на Twitch.tv
   - GEOSITE,category-ai-!cn,AI
   - RULE-SET,AI-custom,AI
+  # Вся сессия Google — одним выходом.
+  #
+  # Gemini сверяет страну не по одному запросу, а по сессии целиком. Пока
+  # домены расходились по группам, браузер уходил в Google через четыре узла
+  # в трёх странах разом (проверено захватом 26.08.2026: gemini — Нидерланды,
+  # www.google.com — Польша, play/photos — Латвия, lh3.googleusercontent.com —
+  # заблокированный nv 1 через группу YouTube). Google считал такую сессию
+  # несогласованной и возвращал заглушку про страну уже после загрузки чата.
+  #
+  # Правило стоит ВЫШЕ YouTube намеренно: иначе googleusercontent.com
+  # перехватывает правило YouTube и уводит аватарки Gemini на свой узел.
+  # Побочный эффект: аватарки и превью YouTube тоже идут через группу AI.
+  # YouTube выше: видеотрафик остаётся на своей группе и не утягивается
+  # на узел AI. googleusercontent.com здесь намеренно НЕ упомянут —
+  # аватарки нужны в сессии Google, их забирает правило ниже.
+  - GEOSITE,youtube,YouTube
+  - GEOSITE,google,AI
+  - OR,((DOMAIN-SUFFIX,clients6.google.com),(DOMAIN-SUFFIX,ogs.google.com)),AI
   - GEOSITE,spotify,Spotify
-  - OR,((GEOSITE,youtube),(DOMAIN-SUFFIX,googleusercontent.com)),YouTube
   - GEOSITE,twitch,Twitch
   - GEOSITE,twitter,Twitter
   - RULE-SET,discord,Discord
