@@ -1,0 +1,119 @@
+#!/usr/bin/env python3
+"""Устройства, которым разрешён узел.
+
+  ./bin/client add router      выдать доступ устройству
+  ./bin/client list            кто есть
+  ./bin/client rm phone        отозвать
+  ./bin/client show router     ссылки, QR и блок для config.yaml
+
+Свой UUID на каждое устройство, а не один общий: так доступ отзывается по
+одному устройству, а не у всех сразу. Серверу лишний клиент ничего не стоит.
+Один и тот же UUID работает на обоих входах — отзыв убирает его из обоих.
+
+Файл secrets/clients.tsv — источник истины. После правок нужен ./bin/apply,
+сам по себе этот скрипт сервер не трогает.
+"""
+import os
+import pathlib
+import shutil
+import subprocess
+import sys
+import urllib.parse
+import uuid as uuidlib
+
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+os.chdir(ROOT)
+sys.path.insert(0, str(ROOT / "lib"))
+from conf import read_conf, read_clients, write_clients, die  # noqa: E402
+from render import link, proxy_block  # noqa: E402
+
+CYAN, GREEN, RESET = "\033[1;36m", "\033[1;32m", "\033[0m"
+
+
+def node_ip():
+    try:
+        out = subprocess.run(["hcloud", "server", "ip", read_conf("node.conf")["SERVER_NAME"]],
+                             capture_output=True, text=True, check=True)
+        return out.stdout.strip()
+    except Exception:
+        die("не смог узнать IP узла через hcloud — проверь токен")
+
+
+def cmd_add(name):
+    clients = read_clients()
+    if any(n == name for n, _ in clients):
+        die(f"устройство {name} уже есть")
+    new = str(uuidlib.uuid4())
+    clients.append((name, new))
+    write_clients(clients)
+    print(f"{GREEN}  ✓{RESET} {name}: {new}")
+    print(f"{CYAN}==>{RESET} теперь ./bin/apply, чтобы узел узнал о нём")
+
+
+def cmd_rm(name):
+    clients = read_clients()
+    left = [(n, u) for n, u in clients if n != name]
+    if len(left) == len(clients):
+        die(f"устройства {name} нет")
+    write_clients(left)
+    print(f"{GREEN}  ✓{RESET} {name} убран")
+    print(f"{CYAN}==>{RESET} доступ пропадёт после ./bin/apply")
+
+
+def cmd_list():
+    clients = read_clients()
+    if not clients:
+        print("(пусто)")
+        return
+    for n, u in clients:
+        print(f"  {n:<12} {u}")
+
+
+def cmd_show(name):
+    conf = read_conf("node.conf")
+    if not pathlib.Path("secrets/keys.env").exists():
+        die("нет secrets/keys.env — сначала ./bin/apply")
+    keys = read_conf("secrets/keys.env")
+    match = [(n, u) for n, u in read_clients() if n == name]
+    if not match:
+        die(f"устройства {name} нет")
+    _, uuid = match[0]
+    ip = node_ip()
+
+    for kind, label in (("xhttp", "основной вход, XHTTP"), ("vision", "запасной вход, Vision")):
+        url = link(kind, name, uuid, conf, keys, ip)
+        print(f"\n{CYAN}==>{RESET} {name} — {label}\n")
+        print(url)
+        if not shutil.which("qrencode"):
+            print("  (для QR: brew install qrencode)")
+            continue
+        # QR кладём файлом, а не рисуем в терминал: вывод команды до глаз
+        # доходит не всегда, а картинку можно открыть и отсканировать.
+        # Каталог secrets/ в .gitignore — в QR лежат рабочие реквизиты.
+        png = pathlib.Path("secrets") / f"qr-{name}-{kind}.png"
+        subprocess.run(["qrencode", "-s", "8", "-m", "2", "-o", str(png), url], check=False)
+        png.chmod(0o600)
+        print(f"  QR: node/{png}")
+    print(f"\n{CYAN}==>{RESET} блок для секции proxies: в config.yaml\n")
+    print(proxy_block("xhttp", "Свой узел XHTTP", uuid, conf, keys, ip))
+    print(proxy_block("vision", "Свой узел Vision", uuid, conf, keys, ip))
+
+
+def main():
+    args = sys.argv[1:]
+    if not args:
+        sys.exit(__doc__)
+    cmd, rest = args[0], args[1:]
+    if cmd == "add" and rest:
+        cmd_add(rest[0])
+    elif cmd == "rm" and rest:
+        cmd_rm(rest[0])
+    elif cmd == "list":
+        cmd_list()
+    elif cmd == "show" and rest:
+        cmd_show(rest[0])
+    else:
+        sys.exit(__doc__)
+
+
+main()

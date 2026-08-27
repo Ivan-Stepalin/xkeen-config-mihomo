@@ -4,6 +4,17 @@ redir-port: 1080
 tproxy-port: 1081
 ipv6: false
 mode: rule
+
+# Задержка мерится без первого рукопожатия: иначе url-test сравнивает узлы
+# нечестно — у транспортов разная цена установки соединения, и XHTTP с Vision
+# на одном и том же сервере давали бы разные числа при равной скорости.
+unified-delay: true
+# Соединение устанавливается ко всем адресам домена разом, побеждает первый
+# ответивший. Заметно на доменах с записями в нескольких сетях.
+tcp-concurrent: true
+# Сопоставление трафика с процессами на роутере бессмысленно — трафик не
+# локальный, — а процессор оно тратит. Выключено явно, а не по умолчанию.
+find-process-mode: off
 geodata-mode: true
 geodata-loader: memconservative
 geo-auto-update: true
@@ -21,6 +32,15 @@ sniffer:
   enable: true
   force-dns-mapping: true
   parse-pure-ip: true
+  # Свой узел исключён из сниффинга. Иначе parse-pure-ip плюс TLS-сниффер на
+  # 443 разбирают ClientHello соединения к голому IP узла, видят там SNI
+  # www.samsung.com (маскировка Reality) и подменяют адресат на настоящий
+  # www.samsung.com. Телефон или ноутбук в LAN, подключённый к узлу напрямую,
+  # получает в ответ подлинный сертификат донора и падает с
+  # «REALITY authentication failed» при исправном узле.
+  # На сам роутер это не влияло: свои исходящие подключения он не сниффит.
+  skip-dst-address:
+    - ${NODE_S_IP}/32
   sniff:
     HTTP:
       ports: [80, 8080-8880]
@@ -43,8 +63,8 @@ x-templates:
   # Группа: узлы обеих подписок + ручной выбор запасных вариантов.
   select: &select
     type: select
-    use: [subscription, subscription2]
-    proxies: [Свободный интернет, Подписка A, Подписка B, DIRECT]
+    use: [subscription]
+    proxies: [Свой узел, Свободный интернет, Подписка, DIRECT]
 
   # Подписка: общие поля, различаются только url, path и префикс имён.
   provider: &provider
@@ -52,7 +72,8 @@ x-templates:
     interval: 3600
     health-check:
       enable: true
-      url: http://www.msftncsi.com/ncsi.txt
+      url: https://cp.cloudflare.com/generate_204
+      expected-status: 204
       interval: 120
 
   # Группа: автовыбор быстрейшего узла внутри одной подписки.
@@ -60,7 +81,8 @@ x-templates:
   # иначе роутер гонял бы health-check по всем узлам обеих подписок втройне.
   sub-test: &sub-test
     type: url-test
-    url: http://www.msftncsi.com/ncsi.txt
+    url: https://cp.cloudflare.com/generate_204
+    expected-status: 204
     interval: 120
     tolerance: 50
 
@@ -111,17 +133,91 @@ x-templates:
 # Чтобы изменить список запасных вариантов, допишите своё поле proxies —
 # оно перекроет значение из шаблона (пример: Cloudflare ниже).
 # ══════════════════════════════════════════════════════════════════════
+# СВОЙ УЗЕЛ
+#   Прописан здесь, а не подпиской: подписка с самого узла требовала на нём
+#   nginx с настоящим доменом и сертификатом, а замер 27.08.2026 показал, что
+#   честное имя в SNI душат на первом окне TCP. Весь тот слой снесён.
+#
+#   Два входа на одном сервере с РАЗНЫМИ донорами: если одно имя начнут
+#   душить, второй вход продолжает работать. Проверено замером — оба отдают
+#   10 МБ на 12-13 МБ/с, см. node/README.md.
+#
+#   Реквизиты подставляются smudge-фильтром из .secrets.yaml, в коммит уходят
+#   плейсхолдеры. Обновляются командой ./node/bin/client show router.
+# ══════════════════════════════════════════════════════════════════════
+proxies:
+  # Основной вход. XHTTP в режиме stream-one сворачивает обмен в один поток:
+  # ТСПУ с июня 2026 морозит на 120 секунд всё, что открывает больше трёх
+  # параллельных TLS к одному имени за 350-400 мс, а health-check группы
+  # url-test делает ровно это.
+  - name: Свой узел XHTTP
+    type: vless
+    server: ${NODE_S_IP}
+    port: 443
+    uuid: ${NODE_S_UUID}
+    udp: true
+    packet-encoding: xudp
+    tls: true
+    network: xhttp
+    alpn: [h2]
+    servername: www.samsung.com
+    client-fingerprint: firefox
+    reality-opts:
+      public-key: ${NODE_S_PBK_X}
+      short-id: ${NODE_S_SID_X}
+    xhttp-opts:
+      path: ${NODE_S_PATH}
+      mode: stream-one
+
+  # Запасной вход: классический Vision поверх сырого TCP. Именно эту связку
+  # массово блокировали у проводных операторов РФ, поэтому она вторая, а не
+  # первая — но на замере держится наравне.
+  - name: Свой узел Vision
+    type: vless
+    server: ${NODE_S_IP}
+    port: 2096
+    uuid: ${NODE_S_UUID}
+    udp: true
+    packet-encoding: xudp
+    tls: true
+    flow: xtls-rprx-vision
+    network: tcp
+    servername: www.nvidia.com
+    client-fingerprint: firefox
+    reality-opts:
+      public-key: ${NODE_S_PBK_V}
+      short-id: ${NODE_S_SID_V}
+
+# ══════════════════════════════════════════════════════════════════════
 proxy-groups:
+  # Свой VPS: автовыбор среди его транспортов. Смысл в том, что при блокировке
+  # одного транспорта группа сама переходит на другой — узел один, путей до
+  # него пять, и ТСПУ приходится ломать каждый отдельно.
+  - name: Свой узел
+    type: url-test
+    url: https://cp.cloudflare.com/generate_204
+    expected-status: 204
+    interval: 120
+    tolerance: 100
+    lazy: false
+    proxies: [Свой узел XHTTP, Свой узел Vision]
+    icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Server.png
+
   # Автовыбор быстрейшего узла подписки. Используется как «прокси по
   # умолчанию» в шаблоне *select, поэтому объявлен первым.
   - name: Свободный интернет
     type: url-test
-    url: http://www.msftncsi.com/ncsi.txt
+    url: https://cp.cloudflare.com/generate_204
+    expected-status: 204
     interval: 120
     tolerance: 50
     lazy: false
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Available_1.png
-    include-all: true
+    # Только узлы подписки. Было include-all: true, а оно втягивает и узлы,
+    # описанные в proxies: — то есть оба входа своего узла попадали в этот
+    # автопул вторым путём, хотя «Свой узел» и так стоит первым вариантом в
+    # каждой группе.
+    include-all-providers: true
     # Семейство nv — самое быстрое, поэтому url-test выбирал именно его, и на
     # него садились все сервисы Google, кроме группы AI. Google блокирует эти
     # IP (петля GOOGLE_ABUSE), из-за чего Gemini падал на заглушку про страну
@@ -129,17 +225,13 @@ proxy-groups:
     # причине. Узлы остаются доступны для выбора вручную в любой группе.
     exclude-filter: "(?i)(nv [0-9]|\U0001F1F7\U0001F1FA)"
 
-  # Автовыбор внутри одной подписки: «идти только через A» / «только через B».
-  # Доступны как вариант в каждой группе ниже — см. proxies в шаблоне *select.
+  # Автовыбор по подписке без изъятий. Отличается от «Свободного интернета»
+  # тем, что не отбрасывает семейство nv и российские выходы — нужен, когда
+  # надо дотянуться именно до них, не выбирая узел руками.
   - <<: *sub-test
-    name: Подписка A
+    name: Подписка
     use: [subscription]
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Server.png
-
-  - <<: *sub-test
-    name: Подписка B
-    use: [subscription2]
-    icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Round_Robin.png
 
   - <<: *select
     name: YouTube
@@ -181,37 +273,80 @@ proxy-groups:
   - <<: *select
     name: Cloudflare
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Cloudflare.png
-    proxies: [PASS, Свободный интернет, Подписка A, Подписка B, DIRECT]
+    proxies: [PASS, Свой узел, Свободный интернет, Подписка, DIRECT]
 
-  # Google блокирует часть узлов подписки по IP: вместо чата Gemini они
-  # отдают петлю редиректов на GOOGLE_ABUSE_EXEMPTION, и страница показывает
-  # заглушку «Gemini пока не поддерживается в вашей стране». Проверено
-  # 26.08.2026: семейство nv блокируется, узлы d/dt/st 2/France/Poland и
-  # немецкие из подписки B — работают. Поэтому у AI свой автовыбор, из
-  # которого nv и российские выходы исключены.
+  # У Google и у остальных AI-сервисов требования к выходу разные и
+  # несовместимые, поэтому групп две, а не одна.
+  #
+  # Google определяет страну по своей гео-базе, а не по тому, где физически
+  # стоит сервер, и почти всю подписку считает российской. Для Gemini это
+  # заглушка «не поддерживается в вашей стране». Годных узлов единицы, и
+  # список приходится держать руками (см. Google-выход ниже).
+  #
+  # Claude, ChatGPT и прочим достаточно любого быстрого нероссийского узла:
+  # проверено 26.08.2026, api.anthropic.com и api.openai.com отвечают 401
+  # (то есть пускают) через все узлы подписки A, включая те, что Google
+  # считает российскими.
+  #
+  # Пока обе задачи решала одна группа AI, узкий и хрупкий список под Google
+  # управлял выходом и для Claude: когда закреплённый узел умирал (так вышло
+  # с Netherlands Lt 1), вместе с Gemini отваливались Claude и ChatGPT.
+  # Разделение убирает эту связь: смерть узла в Google-выходе больше не
+  # касается остальных сервисов.
+
+  # Автовыбор среди узлов, которые Google считает нероссийскими.
+  #
+  # Белый список, а не чёрный: Google относит IP к странам произвольно, и по
+  # названию узла предсказать вердикт нельзя — Poland n1 и n2 для него
+  # российские, а n3, n4, n6, n7 нет, при одном провайдере и одной стране в
+  # имени. Проверено перебором 26.08.2026: из живых узлов подписки A годны
+  # шесть — четыре польских (~85 мс, Google видит PL), India (168 мс, IN) и
+  # Singapore (276 мс, US). Netherlands Lt 1 в списке седьмым: утром он был
+  # годен (NL), к вечеру умер; fallback мёртвые пропускает, так что пусть
+  # лежит запасным. Из 88 узлов подписки B живы 14, и все, кроме трёх
+  # американских, для Google российские — включая немецкие и шведские, про
+  # которые раньше думали обратное. Американские не взяты намеренно: 570-630 мс
+  # и Gemini на них отдаёт обрезанный ответ вместо страницы.
+  #
+  # Список стареет при любой замене или переименовании узлов у провайдера.
+  # Обновить: ruby scripts/probe-google.rb — он опрашивает Google через
+  # каждый узел и печатает готовую строку filter.
+  #
   # fallback, а не url-test: url-test гонится за скоростью и переключал бы
   # узел каждые 120 секунд прямо посреди диалога — для Google это смена
-  # страны в рамках одной сессии и повод снова показать заглушку.
-  # fallback держится за один узел, пока он жив.
-  - name: AI-выход
+  # страны в рамках одной сессии и повод снова показать заглушку. fallback
+  # держится за первый живой узел по порядку и меняет его только при смерти.
+  # Порядок здесь — порядок узлов в подписке: сначала польские (~85 мс),
+  # India, Singapore и Lt 1 идут после и включаются только если польские умрут.
+  # lazy: false — иначе группа не знает, какие узлы живы, до первого запроса,
+  # и первый же диалог уходит в мёртвый узел.
+  - name: Google-выход
     type: fallback
-    url: http://www.msftncsi.com/ncsi.txt
-    interval: 120
-    use: [subscription, subscription2]
-    # Белый список, а не чёрный. Google относит IP к странам по своей базе,
-    # и почти вся подписка помечена у него как RU независимо от того, где
-    # сервер стоит физически: проверено 26.08.2026 перебором всех живых
-    # узлов — 43 из 54 Google считает российскими. Здесь перечислены те,
-    # на которых Google отдаёт нероссийскую локаль (pl / nl / en) и Gemini
-    # грузится целиком. Проверять так: запрос на www.google.com через узел,
-    # в ответе не должно быть ">Россия<" и hl=ru.
-    filter: "(?i)(Poland n[3467]|Netherlands Lt 1|India|Singapore)"
-    icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Bot.png
+    url: https://cp.cloudflare.com/generate_204
+    expected-status: 204
+    interval: 60
+    lazy: false
+    # Свой узел стоит первым: fallback держится за него, пока он жив, и
+    # уходит в подписочный белый список только если VPS умрёт. Ручной
+    # список ниже поэтому больше не критичен, но остаётся страховкой.
+    proxies: [Свой узел]
+    use: [subscription]
+    filter: "(?i)(Poland n[3467]|India|Singapore|Netherlands Lt 1)"
+    icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Google_Search.png
 
+  # Вся сессия Google: поиск, аккаунты, Gemini, gstatic, аватарки.
+  - <<: *select
+    name: Google
+    icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Google.png
+    proxies: [Google-выход, Свой узел, Свободный интернет, Подписка, DIRECT]
+
+  # Claude, ChatGPT и остальные AI, кроме Google. Здесь белый список не нужен:
+  # ограничение только одно — не российский IP, а его уже держит
+  # «Свободный интернет» своим exclude-filter.
   - <<: *select
     name: AI
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Bot.png
-    proxies: [AI-выход, Свободный интернет, Подписка A, Подписка B, DIRECT]
+    proxies: [Свой узел, Свободный интернет, Подписка, DIRECT]
 
   - <<: *select
     name: Twitter
@@ -277,15 +412,16 @@ proxy-groups:
     proxies: [REJECT, PASS]
 
 # ══════════════════════════════════════════════════════════════════════
-# ПОДПИСКИ
+# ПОДПИСКА
 #
-# Обе подключены одновременно: узлы обеих видны во всех группах, а группы
-# «Подписка A» / «Подписка B» дают выбор конкретной подписки.
+# Одна. Вторая (префикс «[B] ») убрана 27.08.2026 как лишняя: свой узел
+# закрывает то, ради чего держали второй источник. Её ссылка осталась в
+# .secrets.yaml под ключом SUB_B — файл локальный, а других копий нет.
 #
-#   path             обязан быть разным, иначе провайдеры перезапишут
-#                    файл друг друга;
-#   additional-prefix помечает узлы «[A] » / «[B] », чтобы имена из разных
-#                    подписок не столкнулись и было видно происхождение.
+#   path             файл кэша; при добавлении второй подписки он обязан быть
+#                    другим, иначе провайдеры перезапишут файл друг друга;
+#   additional-prefix помечает узлы «[A] », чтобы они не путались с узлами
+#                    своего сервера, описанными в proxies:.
 # ══════════════════════════════════════════════════════════════════════
 proxy-providers:
   subscription:
@@ -295,12 +431,6 @@ proxy-providers:
     override:
       additional-prefix: "[A] "
 
-  subscription2:
-    <<: *provider
-    url: ${SUB_B}
-    path: ./proxy-providers/subscription2.yaml
-    override:
-      additional-prefix: "[B] "
 
 # ══════════════════════════════════════════════════════════════════════
 # RULE-PROVIDER'Ы
@@ -481,10 +611,13 @@ rule-providers:
 # Проверить порядок и ссылки: ruby scripts/validate.rb
 # ══════════════════════════════════════════════════════════════════════
 rules:
+  # Первым правилом: туннель до своего узла идёт напрямую. Иначе соединение
+  # телефона к узлу поехало бы внутри чужого подписочного прокси — лишний
+  # крюк, лишняя задержка и ещё одна точка отказа. no-resolve — адрес и так
+  # известен, DNS для него не нужен.
+  - IP-CIDR,${NODE_S_IP}/32,DIRECT,no-resolve
   - AND,((DST-PORT,443),(NETWORK,UDP)),QUIC
   - OR,((DOMAIN-SUFFIX,gql.twitch.tv),(DOMAIN-SUFFIX,usher.ttvnw.net)),Свободный интернет # Разблокировка высокого качества на Twitch.tv
-  - GEOSITE,category-ai-!cn,AI
-  - RULE-SET,AI-custom,AI
   # Вся сессия Google — одним выходом.
   #
   # Gemini сверяет страну не по одному запросу, а по сессии целиком. Пока
@@ -494,15 +627,22 @@ rules:
   # заблокированный nv 1 через группу YouTube). Google считал такую сессию
   # несогласованной и возвращал заглушку про страну уже после загрузки чата.
   #
-  # Правило стоит ВЫШЕ YouTube намеренно: иначе googleusercontent.com
-  # перехватывает правило YouTube и уводит аватарки Gemini на свой узел.
-  # Побочный эффект: аватарки и превью YouTube тоже идут через группу AI.
-  # YouTube выше: видеотрафик остаётся на своей группе и не утягивается
-  # на узел AI. googleusercontent.com здесь намеренно НЕ упомянут —
+  # Правила Google стоят ВЫШЕ правил остальных AI намеренно: и
+  # GEOSITE,category-ai-!cn, и RULE-SET,AI-custom содержат gemini.google.com,
+  # accounts.google.com, gstatic.com и бэкенд alkali…clients6. Стой они выше,
+  # домены Gemini ушли бы в группу AI, к Claude и ChatGPT, — то есть на узел,
+  # который Google почти наверняка считает российским.
+  #
+  # YouTube выше Google: видеотрафик остаётся на своей группе и не утягивается
+  # на узел Google. googleusercontent.com здесь намеренно НЕ упомянут —
   # аватарки нужны в сессии Google, их забирает правило ниже.
   - GEOSITE,youtube,YouTube
-  - GEOSITE,google,AI
-  - OR,((DOMAIN-SUFFIX,clients6.google.com),(DOMAIN-SUFFIX,ogs.google.com)),AI
+  - GEOSITE,google,Google
+  - OR,((DOMAIN-SUFFIX,clients6.google.com),(DOMAIN-SUFFIX,ogs.google.com)),Google
+  # Остальные AI: Claude, ChatGPT и прочие. Домены Google сюда уже не дойдут —
+  # их забрали правила выше.
+  - GEOSITE,category-ai-!cn,AI
+  - RULE-SET,AI-custom,AI
   - GEOSITE,spotify,Spotify
   - GEOSITE,twitch,Twitch
   - GEOSITE,twitter,Twitter

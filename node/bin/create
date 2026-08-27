@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+# Создаёт сервер, ssh-ключ и файрвол по node.conf. Идемпотентен: существующее
+# не дублирует и не пересоздаёт.
+#
+# Правила файрвола здесь не задаются — их целиком выставляет ./bin/apply из
+# объявленных портов. Тут создаётся только сам объект, иначе набор правил
+# оказался бы в двух местах.
+source "$(dirname "$0")/../lib/common.sh"
+need hcloud; need_token
+
+if hcloud server describe "$SERVER_NAME" >/dev/null 2>&1; then
+  ok "сервер $SERVER_NAME уже есть: $(node_ip)"
+  exit 0
+fi
+
+say "ssh-ключ"
+if hcloud ssh-key describe "$SSH_KEY_NAME" >/dev/null 2>&1; then
+  ok "ключ $SSH_KEY_NAME уже в проекте"
+else
+  hcloud ssh-key create --name "$SSH_KEY_NAME" --public-key-from-file "${SSH_KEY_FILE}.pub" >/dev/null
+  ok "залит ${SSH_KEY_FILE}.pub"
+fi
+
+say "файрвол"
+if hcloud firewall describe "$FIREWALL_NAME" >/dev/null 2>&1; then
+  ok "файрвол $FIREWALL_NAME уже есть"
+else
+  hcloud firewall create --name "$FIREWALL_NAME" >/dev/null
+  # Пустой файрвол блокирует всё, включая ssh, поэтому сразу открываем 22 с
+  # текущего адреса — иначе до сервера не добраться и ./bin/apply не сработает.
+  hcloud firewall add-rule "$FIREWALL_NAME" --direction in --protocol tcp \
+    --port 22 --source-ips "$(curl -4 -s -m 10 https://ifconfig.me/ip)/32" \
+    --description "ssh from home" >/dev/null
+  ok "создан, 22 открыт с домашнего адреса; остальное выставит ./bin/apply"
+fi
+
+say "сервер $SERVER_NAME ($SERVER_TYPE, $LOCATION, $IMAGE)"
+hcloud server create \
+  --name "$SERVER_NAME" --type "$SERVER_TYPE" --image "$IMAGE" \
+  --location "$LOCATION" --ssh-key "$SSH_KEY_NAME" --firewall "$FIREWALL_NAME" >/dev/null
+IP="$(node_ip)"
+ok "создан: $IP"
+
+say "жду sshd"
+for _ in $(seq 1 30); do
+  if rssh "$IP" true 2>/dev/null; then
+    ok "ssh отвечает"
+    cat <<TXT
+
+Дальше:
+  ./bin/check-ip     годится ли адрес под Google — проверять до всякой настройки
+  ./bin/apply        поставить и настроить узел
+TXT
+    exit 0
+  fi
+  sleep 3
+done
+die "sshd не поднялся за 90 секунд"

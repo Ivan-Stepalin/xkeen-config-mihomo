@@ -78,10 +78,15 @@ end
 cfg.delete('x-templates') # служебный блок якорей, mihomo его не читает
 
 groups    = cfg['proxy-groups'] || []
+manual    = cfg['proxies'] || []
 providers = cfg['rule-providers'] || {}
 rules     = cfg['rules'] || []
 
 group_names = groups.map { |g| g['name'] }.to_set
+# Ручные узлы из секции proxies: — на них группы ссылаются по имени так же,
+# как на другие группы. Узлы из подписок сюда не попадают: их имена приходят
+# от провайдера в рантайме, проверить их статически нельзя.
+manual_names = manual.map { |p| p['name'] }.to_set
 
 # RULE-SET встречается и в rules, и внутри payload у inline-провайдеров.
 inline_payloads = providers.values.flat_map { |p| p['payload'] || [] }
@@ -103,7 +108,7 @@ end
 
 groups.each do |g|
   (g['proxies'] || []).each do |p|
-    next if group_names.include?(p) || BUILTIN_TARGETS.include?(p)
+    next if group_names.include?(p) || manual_names.include?(p) || BUILTIN_TARGETS.include?(p)
 
     err "группа #{g['name'].inspect} ссылается на несуществующий прокси #{p.inspect}"
   end

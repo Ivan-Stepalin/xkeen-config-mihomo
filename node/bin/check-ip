@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# Годится ли IP узла под Google и AI. Код возврата 0 = годится.
+#
+# Нужно при каждой смене адреса: Google относит IP к странам по своей базе, и
+# физическое расположение сервера её не определяет. Замер скорости этого не
+# покажет — узел может отдавать 12 МБ/с и при этом считаться российским.
+source "$(dirname "$0")/../lib/common.sh"
+need hcloud; need_token
+
+IP="${1:-$(node_ip)}"
+say "проверяю $IP"
+OUT="$(rssh "$IP" 'bash -s' < remote/check-ip.sh)" || die "не смог выполнить проверку на узле"
+echo "$OUT" | grep -v '^VERDICT=' | sed 's/^/    /'
+
+if echo "$OUT" | grep -q 'VERDICT=PASS'; then
+  ok "IP годится"
+else
+  bad "IP засвечен. Пересоздать дешевле, чем лечить: ./bin/destroy && ./bin/create"
+  exit 1
+fi

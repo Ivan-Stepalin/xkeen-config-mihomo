@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# Удаляет сервер. Ключ и файрвол остаются: они бесплатны и переиспользуются.
+#
+# Только удаление прекращает тарификацию — выключенный сервер тарифицируется
+# полностью, power off денег не экономит.
+source "$(dirname "$0")/../lib/common.sh"
+need hcloud; need_token
+
+hcloud server describe "$SERVER_NAME" >/dev/null 2>&1 || { ok "сервера нет"; exit 0; }
+
+say "удаляю $SERVER_NAME ($(node_ip))"
+hcloud server delete "$SERVER_NAME" >/dev/null
+ok "удалён"
+
+# Ключи Reality привязаны к снесённому узлу: адрес сменится, а ключи в
+# secrets/keys.env остались бы от прежнего сервера. Убираем, чтобы ./bin/apply
+# сгенерировал новые, а не поднял узел с ключами, которых клиенты не знают.
+if [ -f secrets/keys.env ]; then
+  mv secrets/keys.env "secrets/keys.env.старый-$(date +%Y%m%d-%H%M%S)"
+  ok "secrets/keys.env отложен: новый узел получит новые ключи"
+  say "после ./bin/create && ./bin/apply обновить реквизиты в config.yaml:"
+  echo "    ./bin/client show router"
+fi

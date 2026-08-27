@@ -1,0 +1,183 @@
+#!/usr/bin/env python3
+"""Подбирает донора для маскировки Reality замером из дома.
+
+  ./bin/pick-donor           проверить и замерить всех из donors.conf
+  ./bin/pick-donor --pin     ещё и закрепить победителей в node.conf
+
+Почему замером, а не сканером. 27.08.2026 крестом на четырёх ячейках
+установлено, что обрыв следует за именем в SNI, а не за портом и не за
+транспортом: обскурный сайт из соседней подсети встал на обоих входах,
+крупный сайт на обоих отдал 10 МБ. Сканеры доноров (Reality-SNI-finder и
+родственные) ранжируют кандидатов по TLS-задержке от узла и потому выводят
+наверх именно обскурных соседей — худших доноров из возможных.
+
+Пригодность имени видна с узла (TLS 1.3, h2, x25519, сертификат), а
+проходимость — только из дома, потому что душат путь «дом → узел». Поэтому
+здесь два этапа, и второй обязателен.
+
+Все кандидаты вешаются на запасной вход разом: Reality допускает несколько
+serverNames, так что переналивать узел на каждое имя не нужно.
+"""
+import os
+import pathlib
+import shutil
+import signal
+import subprocess
+import sys
+import time
+
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+os.chdir(ROOT)
+sys.path.insert(0, str(ROOT / "lib"))
+from conf import read_conf, read_clients, die  # noqa: E402
+from render import proxy_block  # noqa: E402
+
+CYAN, GREEN, RED, DIM, RESET = "\033[1;36m", "\033[1;32m", "\033[1;31m", "\033[2m", "\033[0m"
+PORT = 17082
+BYTES = 3_000_000
+URL = f"https://speed.cloudflare.com/__down?bytes={BYTES}"
+
+
+def say(m): print(f"{CYAN}==>{RESET} {m}")
+def ok(m):  print(f"{GREEN}  ✓{RESET} {m}")
+def bad(m): print(f"{RED}  ✗{RESET} {m}")
+
+
+def sh(cmd, **kw):
+    return subprocess.run(cmd, capture_output=True, text=True, **kw)
+
+
+def bash(script):
+    """Гоняем шаговые скрипты проекта через их же общую библиотеку."""
+    return subprocess.run(["bash", "-c", f"source lib/common.sh\n{script}"],
+                          capture_output=True, text=True)
+
+
+def candidates():
+    out = []
+    for line in pathlib.Path("donors.conf").read_text().splitlines():
+        line = line.strip()
+        if line and not line.startswith("#"):
+            out.append(line)
+    return out
+
+
+def measure(name, conf, keys, ip, uuid, workdir):
+    """Скачивание объёма через запасной вход с этим именем в SNI."""
+    cfg = workdir / "probe.yaml"
+    blk = proxy_block("vision", "probe", uuid, conf, keys, ip)
+    blk = blk.replace(f"servername: {conf['SNI_VISION']}", f"servername: {name}")
+    cfg.write_text(
+        f"mixed-port: {PORT}\nmode: rule\nlog-level: silent\nexternal-controller: ''\n"
+        f"proxies:\n{blk}rules:\n  - MATCH,probe\n"
+    )
+    log = open(workdir / "probe.log", "w")
+    proc = subprocess.Popen(["mihomo", "-d", str(workdir), "-f", str(cfg)],
+                            stdout=log, stderr=subprocess.STDOUT)
+    try:
+        for _ in range(40):
+            time.sleep(0.25)
+            if sh(["nc", "-z", "127.0.0.1", str(PORT)]).returncode == 0:
+                break
+        else:
+            return None
+        r = sh(["curl", "-x", f"socks5h://127.0.0.1:{PORT}", "-sS", "-o", "/dev/null",
+                "-w", "%{size_download} %{speed_download}", "--max-time", "45", URL])
+        if not r.stdout.strip():
+            return {"name": name, "bytes": 0, "mbs": 0.0}
+        size, speed = r.stdout.split()
+        return {"name": name, "bytes": int(float(size)), "mbs": float(speed) / 1024 / 1024}
+    finally:
+        proc.send_signal(signal.SIGTERM)
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+        log.close()
+
+
+def main():
+    pin = "--pin" in sys.argv[1:]
+    for a in sys.argv[1:]:
+        if a != "--pin":
+            die(f"не понял аргумент: {a}")
+    if not shutil.which("mihomo"):
+        die("нет mihomo — поставь: brew install mihomo")
+    if not pathlib.Path("secrets/keys.env").exists():
+        die("нет secrets/keys.env — сначала ./bin/apply")
+
+    cands = candidates()
+    say(f"этап 1: пригодность {len(cands)} имён, проверка с узла")
+    r = bash(f'rssh "$(node_ip)" "bash -s -- {" ".join(cands)}" < remote/check-donors.sh')
+    if r.returncode != 0:
+        die(f"проверка на узле не прошла: {r.stderr[-300:]}")
+    good = []
+    for line in sorted(r.stdout.splitlines()):
+        if line.startswith("PASS"):
+            good.append(line.split()[1])
+            ok(line[5:])
+        elif line.startswith("SKIP"):
+            bad(line[5:])
+    if not good:
+        die("ни одно имя не годится как донор")
+
+    say(f"этап 2: вешаю {len(good)} имён на запасной вход одним деплоем")
+    bash(f'set_conf PROBE_SNIS "{",".join(good)}"')
+    r = bash("./bin/apply")
+    if r.returncode != 0:
+        print(r.stdout[-1500:], r.stderr[-500:])
+        die("apply не прошёл")
+    ok("узел принял все имена")
+
+    conf = read_conf("node.conf")
+    keys = read_conf("secrets/keys.env")
+    uuid = read_clients()[0][1]
+    ip = sh(["hcloud", "server", "ip", conf["SERVER_NAME"]]).stdout.strip()
+    workdir = pathlib.Path("secrets/verify")
+    workdir.mkdir(exist_ok=True)
+
+    say(f"этап 3: замер из дома, по {BYTES // 1000} КБ на имя")
+    results = []
+    for name in good:
+        res = measure(name, conf, keys, ip, uuid, workdir)
+        if res is None:
+            bad(f"{name:<24} клиент не поднялся")
+            continue
+        results.append(res)
+        # Обрыв на первом окне TCP укладывается в десятки килобайт. Всё, что
+        # не дотянуло до половины объёма, считаем непроходимым, а не медленным.
+        if res["bytes"] < BYTES // 2:
+            bad(f"{name:<24} {res['bytes']:>8} байт — обрыв")
+        else:
+            ok(f"{name:<24} {res['bytes']:>8} байт   {res['mbs']:.2f} МБ/с")
+
+    live = sorted((r for r in results if r["bytes"] >= BYTES // 2),
+                  key=lambda r: -r["mbs"])
+    print()
+    if not live:
+        die("ни одно имя не прошло замер — фильтр душит все кандидаты из donors.conf")
+
+    say(f"прошли замер: {len(live)} из {len(good)}")
+    for r in live:
+        print(f"  {r['name']:<24} {r['mbs']:.2f} МБ/с")
+
+    bash('set_conf PROBE_SNIS ""')
+    if pin and len(live) >= 1:
+        # Разные имена на двух входах: если одно засветят и начнут душить,
+        # второй вход продолжает работать.
+        first = live[0]["name"]
+        second = live[1]["name"] if len(live) > 1 else first
+        print()
+        bash(f'set_conf SNI_XHTTP "{first}"')
+        bash(f'set_conf SNI_VISION "{second}"')
+        say("закрепляю и переналиваю узел")
+        r = bash("./bin/apply")
+        if r.returncode != 0:
+            print(r.stdout[-800:])
+            die("apply не прошёл")
+        ok(f"основной вход {first}, запасной {second}")
+    else:
+        say("режим подбора снят; закрепить победителей — ./bin/pick-donor --pin")
+
+
+main()

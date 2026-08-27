@@ -1,0 +1,147 @@
+#!/usr/bin/env python3
+"""Собирает конфиг Xray из node.conf, secrets/keys.env и secrets/clients.tsv.
+
+Конфиг генерируется, а не правится руками: два входа, список клиентов и два
+донора — слишком много мест, где рассинхрон заметен только по неработающему
+узлу. Здесь же он собирается один раз из объявленного состояния.
+
+Пишет secrets/xray.json. Ничего не отправляет на сервер — это делает bin/apply.
+"""
+import json, os, pathlib, sys
+
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+os.chdir(ROOT)
+sys.path.insert(0, str(ROOT / "lib"))
+from conf import read_conf, read_clients, die  # noqa: E402
+
+
+conf = read_conf("node.conf")
+if not pathlib.Path("secrets/keys.env").exists():
+    die("нет secrets/keys.env — сначала ./bin/apply")
+keys = read_conf("secrets/keys.env")
+
+clients = read_clients()
+if not clients:
+    die("нет ни одного клиента — сначала ./bin/client add router")
+
+for req in ("SNI_XHTTP", "SNI_VISION", "PORT_XHTTP", "PORT_VISION"):
+    if not conf.get(req):
+        die(f"в node.conf не заполнено {req}")
+
+
+def reality(prefix, sni, extra_names=()):
+    # extra_names — режим подбора донора: Reality допускает несколько имён на
+    # одном входе, поэтому все кандидаты вешаются разом и мерятся из дома без
+    # переналивки узла на каждого. target при этом остаётся один и с
+    # остальными именами не совпадает — для замера это неважно, но держать
+    # так постоянно не нужно, победитель закрепляется одним именем.
+    names = [sni] + [n for n in extra_names if n and n != sni]
+    return {
+        "show": False,
+        # target и serverNames обязаны совпадать: практики сходятся на том,
+        # что рассогласование само по себе служит признаком для фильтра.
+        "target": f"{sni}:443",
+        "serverNames": names,
+        "privateKey": keys[f"{prefix}_PRIVATE_KEY"],
+        "shortIds": [keys[f"{prefix}_SHORT_ID"]],
+        # Без этой строки mihomo не пускают. Xray 26.x по умолчанию требует
+        # клиента не старше своей версии и отбрасывает остальных до проверки
+        # ключей, а mihomo объявляет себя REALITY-клиентом 1.8.2. На клиенте
+        # это выглядит как "REALITY authentication failed" без объяснений.
+        "minClientVer": "1.8.0",
+    }
+
+
+sniffing = {
+    "enabled": True,
+    "destOverride": ["http", "tls", "quic"],
+    # routeOnly: имя нужно только для маршрутизации, подменять адрес
+    # соединения не надо — иначе ломается доступ по голому IP.
+    "routeOnly": True,
+}
+
+config = {
+    "log": {"loglevel": "warning"},
+    "inbounds": [
+        {
+            # Основной вход. XHTTP сворачивает пачку соединений в одну сессию,
+            # а ТСПУ с июня 2026 морозит на 120 секунд всё, что открывает
+            # больше трёх параллельных TLS к одному имени за 350-400 мс.
+            # Health-check группы url-test в mihomo делает ровно это.
+            "tag": "in-xhttp",
+            "listen": "0.0.0.0",
+            "port": int(conf["PORT_XHTTP"]),
+            "protocol": "vless",
+            "settings": {
+                # flow здесь не указывается: xtls-rprx-vision работает только
+                # поверх сырого TCP, с XHTTP он несовместим.
+                "clients": [{"id": u, "email": n} for n, u in clients],
+                # Штатное значение. VLESS Encryption (ML-KEM-768) намеренно не
+                # включаем: у mihomo она сломана — MLKEM768 не согласуется, а
+                # откат на x509 битый.
+                "decryption": "none",
+            },
+            "streamSettings": {
+                "network": "xhttp",
+                "security": "reality",
+                "realitySettings": reality("XHTTP", conf["SNI_XHTTP"]),
+                # Своего мультиплексирования у XHTTP достаточно, xmux на
+                # сервере не задаём — им управляет клиент.
+                "xhttpSettings": {"path": keys["XHTTP_PATH"], "mode": "auto"},
+            },
+            "sniffing": sniffing,
+        },
+        {
+            # Запасной вход: классический Vision поверх сырого TCP. Держим на
+            # отдельном порту и с другим донором, потому что именно эту связку
+            # массово блокировали у проводных операторов РФ — она может не
+            # подняться там, где XHTTP пройдёт. Какая ставка верна, покажет
+            # замер из дома, а не рассуждение.
+            "tag": "in-vision",
+            "listen": "0.0.0.0",
+            "port": int(conf["PORT_VISION"]),
+            "protocol": "vless",
+            "settings": {
+                "clients": [
+                    {"id": u, "flow": "xtls-rprx-vision", "email": n} for n, u in clients
+                ],
+                "decryption": "none",
+            },
+            "streamSettings": {
+                # "raw" — текущее имя сырого TCP в Xray; "tcp" остался
+                # синонимом. Клиент mihomo пишет у себя network: tcp.
+                "network": "raw",
+                "security": "reality",
+                "realitySettings": reality(
+                    "VISION", conf["SNI_VISION"],
+                    [n.strip() for n in conf.get("PROBE_SNIS", "").split(",")],
+                ),
+            },
+            "sniffing": sniffing,
+        },
+    ],
+    "outbounds": [
+        # UseIPv4: у узла есть IPv6, и без этой строки часть сервисов уходит
+        # по нему и отдаёт другую геолокацию, чем ожидает клиент.
+        {"protocol": "freedom", "tag": "direct", "settings": {"domainStrategy": "UseIPv4"}},
+        {"protocol": "blackhole", "tag": "block"},
+    ],
+    "routing": {
+        "rules": [
+            # Торрент в blackhole: Hetzner на abuse-жалобы отвечает
+            # блокировкой без разговоров.
+            {"type": "field", "protocol": ["bittorrent"], "outboundTag": "block"},
+            # Локальные сети закрыты, чтобы узел не стал точкой входа во
+            # внутреннюю сеть датацентра.
+            {"type": "field", "ip": ["geoip:private"], "outboundTag": "block"},
+        ]
+    },
+}
+
+out = pathlib.Path("secrets/xray.json")
+out.write_text(json.dumps(config, indent=2, ensure_ascii=False) + "\n")
+out.chmod(0o600)
+probes = [n.strip() for n in conf.get("PROBE_SNIS", "").split(",") if n.strip()]
+print(f"  ✓ secrets/xray.json: входы {conf['PORT_XHTTP']}/xhttp ({conf['SNI_XHTTP']}) "
+      f"и {conf['PORT_VISION']}/vision ({conf['SNI_VISION']}), клиентов {len(clients)}"
+      + (f", в подборе ещё {len(probes)} имён" if probes else ""))

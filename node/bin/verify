@@ -1,0 +1,176 @@
+#!/usr/bin/env python3
+"""Проверка узла скачиванием объёма через сам туннель.
+
+  ./bin/verify           оба входа
+  ./bin/verify xhttp     только основной
+
+Меряем именно байты и скорость, а не код ответа и задержку. Причина: узел
+может отвечать за 180 мс, отдавать 200 OK и возвращать 101 Switching
+Protocols — и при этом не передавать ничего. Обрыв наступает ровно на одном
+начальном окне TCP, ~16 КБ, а в это окно укладываются и страница-заглушка, и
+рукопожатие, и DNS-ответ. Из-за этого health-check группы url-test считал
+заведомо мёртвый узел здоровым.
+
+Клиент — тот же mihomo, что стоит на роутере, и конфиг собирается из того же
+кода, что блок для config.yaml. Значит проверяется ровно то, что поедет
+в прод, включая имена полей xhttp-opts.
+"""
+import os
+import pathlib
+import re
+import shutil
+import signal
+import subprocess
+import sys
+import time
+
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+os.chdir(ROOT)
+sys.path.insert(0, str(ROOT / "lib"))
+from conf import read_conf, read_clients, die  # noqa: E402
+from render import proxy_block  # noqa: E402
+
+CYAN, GREEN, RED, DIM, RESET = "\033[1;36m", "\033[1;32m", "\033[1;31m", "\033[2m", "\033[0m"
+
+PORT = 17080
+# Объём берём в Германии, там же где узел: далёкое плечо должно быть заведомо
+# быстрым, иначе замерим не туннель, а чужой сервер.
+# speed.hetzner.de из самого Hetzner не отвечает — видимо, закрыт для своих
+# же диапазонов. Держим вторым на случай, если первый источник упадёт.
+SOURCES = [
+    ("cloudflare", "https://speed.cloudflare.com/__down?bytes=10000000"),
+    ("speed.hetzner.de", "https://speed.hetzner.de/10MB.bin"),
+]
+
+
+def say(m): print(f"{CYAN}==>{RESET} {m}")
+def ok(m):  print(f"{GREEN}  ✓{RESET} {m}")
+def bad(m): print(f"{RED}  ✗{RESET} {m}")
+
+
+def node_ip(conf):
+    r = subprocess.run(["hcloud", "server", "ip", conf["SERVER_NAME"]],
+                       capture_output=True, text=True)
+    if r.returncode != 0:
+        die("не смог узнать IP узла через hcloud")
+    return r.stdout.strip()
+
+
+def write_client_config(kind, conf, keys, ip, uuid, path):
+    name = f"проверка-{kind}"
+    path.write_text(
+        f"""mixed-port: {PORT}
+mode: rule
+log-level: warning
+external-controller: ''
+proxies:
+{proxy_block(kind, name, uuid, conf, keys, ip)}
+rules:
+  - MATCH,{name}
+"""
+    )
+
+
+def curl(url, fmt, timeout):
+    r = subprocess.run(
+        ["curl", "-x", f"socks5h://127.0.0.1:{PORT}", "-sS", "-o", "/dev/null",
+         "-w", fmt, "--max-time", str(timeout), url],
+        capture_output=True, text=True,
+    )
+    return r.returncode, r.stdout.strip(), r.stderr.strip()
+
+
+def run_one(kind, conf, keys, ip, uuid, workdir):
+    say(f"вход {kind}: {conf['SNI_XHTTP'] if kind == 'xhttp' else conf['SNI_VISION']}")
+    cfg = workdir / f"{kind}.yaml"
+    write_client_config(kind, conf, keys, ip, uuid, cfg)
+    log = open(workdir / f"{kind}.log", "w+")
+    proc = subprocess.Popen(["mihomo", "-d", str(workdir), "-f", str(cfg)],
+                            stdout=log, stderr=subprocess.STDOUT)
+    try:
+        for _ in range(40):
+            time.sleep(0.25)
+            if subprocess.run(["nc", "-z", "127.0.0.1", str(PORT)],
+                              capture_output=True).returncode == 0:
+                break
+        else:
+            log.seek(0)
+            bad("mihomo не открыл порт")
+            print(DIM + log.read()[-800:] + RESET)
+            return None
+
+        rc, out, err = curl("https://ifconfig.me/ip", "%{http_code} %{time_total}", 20)
+        if rc != 0:
+            log.seek(0)
+            text = log.read()
+            bad(f"туннель не встал: curl {rc} {err[:120]}")
+            if "REALITY" in text or "reality" in text:
+                print(DIM + "\n".join(l for l in text.splitlines()
+                                      if "eality" in l)[-600:] + RESET)
+            return None
+        ok(f"туннель поднялся, код {out.split()[0]}")
+
+        for label, url in SOURCES:
+            rc, out, err = curl(url, "%{size_download} %{speed_download} %{http_code}", 90)
+            if rc != 0 or not out:
+                bad(f"{label}: curl {rc} {err[:100]}")
+                continue
+            size, speed, code = out.split()
+            size, speed = int(float(size)), float(speed)
+            mbs = speed / 1024 / 1024
+            if size < 40000:
+                bad(f"{label}: отдал {size} байт и встал — это обрыв на первом окне TCP, "
+                    f"не медленный канал")
+            else:
+                ok(f"{label}: {size} байт, {mbs:.2f} МБ/с (код {code})")
+            return {"kind": kind, "bytes": size, "mbs": mbs}
+        return None
+    finally:
+        proc.send_signal(signal.SIGTERM)
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+        log.close()
+
+
+def main():
+    if not shutil.which("mihomo"):
+        die("нет mihomo — поставь: brew install mihomo")
+    conf = read_conf("node.conf")
+    if not pathlib.Path("secrets/keys.env").exists():
+        die("нет secrets/keys.env — сначала ./bin/apply")
+    keys = read_conf("secrets/keys.env")
+    clients = read_clients()
+    if not clients:
+        die("нет ни одного клиента")
+    uuid = clients[0][1]
+    ip = node_ip(conf)
+
+    kinds = sys.argv[1:] or ["xhttp", "vision"]
+    for k in kinds:
+        if k not in ("xhttp", "vision"):
+            die(f"вход бывает xhttp или vision, не {k}")
+
+    workdir = pathlib.Path("secrets/verify")
+    workdir.mkdir(exist_ok=True)
+
+    results = [r for r in (run_one(k, conf, keys, ip, uuid, workdir) for k in kinds) if r]
+
+    print()
+    if not results:
+        bad("ни один вход не отдал данные")
+        print("""
+Если в логе REALITY authentication failed, а узел при этом исправен —
+проверять с машины за этим же роутером нельзя: в config.yaml включён сниффер
+TLS на 443 с parse-pure-ip, и соединение на голый IP с чужим SNI роутер
+уводит на настоящий сайт донора. Лечится строкой skip-dst-address с адресом
+узла в конфиге роутера.""")
+        sys.exit(1)
+
+    say("итог")
+    for r in sorted(results, key=lambda r: -r["mbs"]):
+        print(f"  {r['kind']:<8} {r['bytes']:>9} байт   {r['mbs']:.2f} МБ/с")
+
+
+main()

@@ -1,0 +1,118 @@
+#!/usr/bin/env bash
+# Приводит узел к состоянию, объявленному в node.conf и secrets/clients.tsv.
+#
+# Один скрипт вместо цепочки нумерованных шагов: порядок и так всегда один и
+# тот же, а помнить его наизусть — лишний источник ошибок. Идемпотентен,
+# гонять можно сколько угодно.
+#
+#   ./bin/apply              обычная сходимость
+#   ./bin/apply --reinstall  переустановить Xray начисто
+source "$(dirname "$0")/../lib/common.sh"
+need hcloud jq; need_token
+
+REINSTALL=0
+for a in "$@"; do
+  case "$a" in
+    --reinstall) REINSTALL=1 ;;
+    *) die "не понял аргумент: $a" ;;
+  esac
+done
+
+IP="$(node_ip)"
+say "узел $SERVER_NAME ($IP)"
+
+# ───────────────────────────────────────────────────── файрвол
+# Файрвол идёт первым шагом намеренно. Правило для ssh привязано к домашнему
+# адресу, а он меняется провайдером — и тогда до сервера не добраться вообще.
+# Если бы файрвол настраивался после подключения, apply падал бы на первом же
+# ssh и не доходил до починки. В этом порядке он лечит доступ сам.
+#
+# Правила задаются целиком, а не добавляются по одному: за день отладки в
+# файрволе накопились открытые 80, 8081, 8388, 8443 и диапазон перескока
+# портов. Замена всего набора гарантирует, что открыто только объявленное.
+say "файрвол Hetzner"
+HOME_IP="$(curl -4 -s -m 10 https://ifconfig.me/ip)" || die "не определил свой внешний IP"
+# Через временный файл, а не через "--rules-file -": stdin эта версия hcloud
+# не читает и висит без таймаута.
+RULES="$(mktemp -t fwrules).json"
+trap 'rm -f "$RULES"' EXIT
+jq -n --arg home "$HOME_IP/32" --argjson xhttp "$PORT_XHTTP" --argjson vision "$PORT_VISION" '
+[
+  { direction:"in", protocol:"tcp", port:"22",              source_ips:[$home],             description:"ssh from home" },
+  { direction:"in", protocol:"tcp", port:($xhttp|tostring), source_ips:["0.0.0.0/0","::/0"], description:"vless xhttp reality" },
+  { direction:"in", protocol:"tcp", port:($vision|tostring),source_ips:["0.0.0.0/0","::/0"], description:"vless vision reality" },
+  { direction:"in", protocol:"icmp",                        source_ips:["0.0.0.0/0","::/0"], description:"ping" }
+]' > "$RULES"
+hcloud firewall replace-rules "$FIREWALL_NAME" --rules-file "$RULES" >/dev/null
+ok "открыто: 22 с $HOME_IP, $PORT_XHTTP, $PORT_VISION, icmp"
+
+# ───────────────────────────────────────────────────── система
+say "система: снос чужого слоя, пакеты, время, BBR, xray"
+rssh "$IP" "bash -s -- $REINSTALL" < remote/provision.sh | sed 's/^/    /'
+
+# ───────────────────────────────────────────────────── ключи
+# Ключи генерируются один раз и живут локально. Пересоздание сменило бы
+# public-key, и все выданные ссылки и конфиг роутера пришлось бы переписывать.
+if [ ! -f secrets/keys.env ]; then
+  say "генерирую ключи Reality"
+  OUT="$(rssh "$IP" 'bash -s' < remote/genkeys.sh)" || { echo "$OUT"; die "генерация ключей не прошла"; }
+  echo "$OUT" | sed -n '/###KEYS###/,$p' | tail -n +2 > secrets/keys.env
+  grep -q '^XHTTP_PRIVATE_KEY=' secrets/keys.env || { cat secrets/keys.env; die "сервер вернул не то"; }
+  chmod 600 secrets/keys.env
+  ok "secrets/keys.env — $(grep -c . secrets/keys.env) значений"
+else
+  ok "ключи на месте, не трогаю"
+fi
+
+# ───────────────────────────────────────────────────── клиенты
+if [ ! -s secrets/clients.tsv ]; then
+  say "первый запуск: выдаю доступ роутеру и телефону"
+  ./bin/client add router | sed 's/^/    /'
+  ./bin/client add phone  | sed 's/^/    /'
+fi
+
+# ───────────────────────────────────────────────────── конфиг
+say "собираю конфиг"
+./bin/render-config
+
+# Проверяем на сервере и только потом подменяем рабочий файл: битый конфиг
+# положит узел, а откатывать придётся по ssh, который на этот же узел и идёт.
+# Имя обязано кончаться на .json — формат Xray берёт из расширения.
+say "проверяю конфиг на сервере, до подмены рабочего"
+rscp secrets/xray.json "$IP" /usr/local/etc/xray/config.staged.json
+rssh "$IP" 'xray run -test -config /usr/local/etc/xray/config.staged.json' >/dev/null 2>&1 \
+  || { rssh "$IP" 'xray run -test -config /usr/local/etc/xray/config.staged.json' 2>&1 | tail -20
+       rssh "$IP" 'rm -f /usr/local/etc/xray/config.staged.json'
+       die "конфиг не проходит проверку — рабочий не тронут"; }
+ok "конфиг валиден"
+
+rssh "$IP" 'set -e
+  mv /usr/local/etc/xray/config.staged.json /usr/local/etc/xray/config.json
+  # Xray работает под nobody, поэтому 600 root:root он прочитать не может и
+  # падает с permission denied. Внутри приватные ключи Reality, так что
+  # отдаём чтение только группе процесса, а не всем.
+  chown root:nogroup /usr/local/etc/xray/config.json
+  chmod 640 /usr/local/etc/xray/config.json
+  systemctl enable xray >/dev/null 2>&1
+  systemctl restart xray
+  sleep 2
+  systemctl is-active --quiet xray'  \
+  || { rssh "$IP" 'journalctl -u xray -n 30 --no-pager' | tail -20; die "xray не поднялся"; }
+ok "xray перезапущен"
+
+# ───────────────────────────────────────────────────── итог
+say "что слушает узел"
+rssh "$IP" "ss -tlnp | awk 'NR>1 {print \$4, \$6}' | grep -E ':($PORT_XHTTP|$PORT_VISION|22)\\b'" | sed 's/^/    /'
+
+for p in "$PORT_XHTTP" "$PORT_VISION"; do
+  rssh "$IP" "ss -tln | grep -q ':$p '" || die "порт $p не слушается"
+done
+ok "оба входа поднялись"
+
+cat <<TXT
+
+Дальше:
+  ./bin/verify           замер скачивания через туннель — единственная
+                         честная проверка, рукопожатие лжёт
+  ./bin/client show router   блок для config.yaml роутера
+TXT

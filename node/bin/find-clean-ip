@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# Перебирает адреса, пока не попадётся годный под Google: создать → проверить →
+# при провале удалить и повторить.
+#
+#   ./bin/find-clean-ip        до 10 попыток
+#   ./bin/find-clean-ip 25     до 25
+#
+# Перебирать не жалко: минимальная единица списания у Hetzner — час, то есть
+# одна попытка стоит около 1.1 евроцента.
+source "$(dirname "$0")/../lib/common.sh"
+need hcloud; need_token
+
+TRIES="${1:-10}"
+[ -n "${TRIES//[0-9]/}" ] && die "число попыток, а не «$TRIES»"
+
+hcloud server describe "$SERVER_NAME" >/dev/null 2>&1 \
+  && die "сервер $SERVER_NAME существует. Сначала ./bin/destroy — этот скрипт удаляет адреса в цикле и не должен трогать живой узел"
+
+for i in $(seq 1 "$TRIES"); do
+  say "попытка $i из $TRIES"
+  ./bin/create >/dev/null || die "не смог создать сервер"
+  IP="$(node_ip)"
+  if ./bin/check-ip "$IP"; then
+    ok "годный адрес найден с попытки $i: $IP"
+    say "дальше: ./bin/apply"
+    exit 0
+  fi
+  bad "$IP не годится, удаляю"
+  hcloud server delete "$SERVER_NAME" >/dev/null
+done
+die "за $TRIES попыток годный адрес не попался — возможно, дело в самой локации ($LOCATION), попробуй другую в node.conf"
