@@ -62,7 +62,10 @@ net.core.somaxconn = 8192
 net.ipv4.tcp_max_syn_backlog = 8192
 net.ipv4.tcp_fastopen = 3
 net.ipv4.tcp_slow_start_after_idle = 0
-net.ipv4.ip_local_port_range = 10000 65000
+# Верхняя граница нечётная намеренно: при одинаковой чётности обеих границ
+# ядро пишет в консоль «ip_local_port_range: prefer different parity» —
+# безвредно, но мусорит в выводе tty и в journalctl.
+net.ipv4.ip_local_port_range = 10000 65001
 SYS
 sysctl --system >/dev/null
 sysctl -n net.ipv4.tcp_congestion_control | grep -qx bbr || { echo "BBR не включился"; exit 1; }

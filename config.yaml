@@ -64,7 +64,7 @@ x-templates:
   select: &select
     type: select
     use: [subscription]
-    proxies: [Свой узел, Свободный интернет, Подписка, DIRECT]
+    proxies: [Выход, Свой узел, Свободный интернет, Подписка, DIRECT]
 
   # Подписка: общие поля, различаются только url, path и префикс имён.
   provider: &provider
@@ -233,6 +233,25 @@ proxy-groups:
     use: [subscription]
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Server.png
 
+  # РУБИЛЬНИК. Первый вариант в шаблоне *select, поэтому все сервисные группы
+  # по умолчанию смотрят сюда, а не на конкретный выход. Смысл: переключить
+  # весь трафик со подписки на свой узел и обратно одним движением, не
+  # обходя тридцать групп руками.
+  #
+  # Google сюда намеренно НЕ заведён: у него свой «Google-выход», потому что
+  # Gemini сверяет страну по сессии целиком и рассогласованные выходы дают
+  # заглушку про страну. Рубильник дёргает всё остальное, Google остаётся
+  # на своей схеме.
+  #
+  # Внимание при заливке на роутер: profile.store-selected: true, то есть
+  # ранее сделанный вручную выбор в группе сохраняется и перекрывает новое
+  # значение по умолчанию. В группах, где вы уже выбирали выход руками,
+  # «Выход» придётся выбрать один раз.
+  - name: Выход
+    type: select
+    proxies: [Свободный интернет, Свой узел, Подписка, DIRECT]
+    icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Rocket.png
+
   - <<: *select
     name: YouTube
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/YouTube.png
@@ -269,11 +288,21 @@ proxy-groups:
     name: Community
     icon: https://github.com/amatol/xkeen-configuration/raw/refs/heads/main/group-icons/community.png
 
+  # Панель и API Hetzner. Своя группа, а не «Свободный интернет» жёстко:
+  # этим управляется сам выходной узел, и когда он падает, выбор выхода для
+  # панели нужен под рукой. Порядок вариантов обратный шаблонному — первым
+  # стоит «Свободный интернет», потому что смысл группы в том, чтобы панель
+  # открывалась быстро, а свой узел в такой момент обычно и есть проблема.
+  - <<: *select
+    name: Hetzner
+    icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Server.png
+    proxies: [Свободный интернет, Подписка, Выход, Свой узел, DIRECT]
+
   # PASS — передать решение следующему правилу вместо отправки в прокси.
   - <<: *select
     name: Cloudflare
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Cloudflare.png
-    proxies: [PASS, Свой узел, Свободный интернет, Подписка, DIRECT]
+    proxies: [PASS, Выход, Свой узел, Свободный интернет, Подписка, DIRECT]
 
   # У Google и у остальных AI-сервисов требования к выходу разные и
   # несовместимые, поэтому групп две, а не одна.
@@ -338,7 +367,7 @@ proxy-groups:
   - <<: *select
     name: Google
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Google.png
-    proxies: [Google-выход, Свой узел, Свободный интернет, Подписка, DIRECT]
+    proxies: [Google-выход, Выход, Свой узел, Свободный интернет, Подписка, DIRECT]
 
   # Claude, ChatGPT и остальные AI, кроме Google. Здесь белый список не нужен:
   # ограничение только одно — не российский IP, а его уже держит
@@ -346,7 +375,7 @@ proxy-groups:
   - <<: *select
     name: AI
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Bot.png
-    proxies: [Свой узел, Свободный интернет, Подписка, DIRECT]
+    proxies: [Выход, Свой узел, Свободный интернет, Подписка, DIRECT]
 
   - <<: *select
     name: Twitter
@@ -618,6 +647,13 @@ rules:
   - IP-CIDR,${NODE_S_IP}/32,DIRECT,no-resolve
   - AND,((DST-PORT,443),(NETWORK,UDP)),QUIC
   - OR,((DOMAIN-SUFFIX,gql.twitch.tv),(DOMAIN-SUFFIX,usher.ttvnw.net)),Свободный интернет # Разблокировка высокого качества на Twitch.tv
+  # Панель и API Hetzner: под MATCH,DIRECT они грузятся мучительно долго, а
+  # ими управляется свой же выходной узел — то есть именно то, чем починяют
+  # VPN, когда VPN не работает. Своего узла тут быть не может: он занят
+  # правилом IP-CIDR выше и остаётся DIRECT, что и нужно — туннель до него
+  # не должен ехать внутри чужого прокси. web-console.hetzner.cloud в этом
+  # же наборе: VNC-консоль сервера идёт через него.
+  - OR,((DOMAIN-SUFFIX,hetzner.com),(DOMAIN-SUFFIX,hetzner.cloud),(DOMAIN-SUFFIX,hetzner.de)),Hetzner
   # Вся сессия Google — одним выходом.
   #
   # Gemini сверяет страну не по одному запросу, а по сессии целиком. Пока
