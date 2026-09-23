@@ -11,3 +11,8 @@ payload:
   - DOMAIN-SUFFIX,embark-studios.com
   # Dead Orbit (signon и др.)
   - DOMAIN-SUFFIX,deadorbit.net
+  # Capcom: игровые бэкенды (sg-prod-api.newmoon и др.)
+  - DOMAIN-SUFFIX,capcom.co
+  # NVIDIA: GeForce Experience / NVIDIA App (ops-gx, gfe, download и др.)
+  - DOMAIN-SUFFIX,nvidia.com
+  - DOMAIN-SUFFIX,geforce.com
