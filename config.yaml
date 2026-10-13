@@ -664,6 +664,19 @@ rules:
   # известен, DNS для него не нужен.
   - IP-CIDR,${NODE_S_IP}/32,DIRECT,no-resolve
   - AND,((DST-PORT,443),(NETWORK,UDP)),QUIC
+  # Сервер синхронизации JacRed — индексера торрентов для Lampa (LXC 103 на
+  # Proxmox, 192.168.1.58:9118). Замер 06.10.2026, порция базы 3,5 МБ:
+  # напрямую — 21 КБ за 150 с и обрыв (душат после первого окна TCP, см.
+  # «Проверять скачиванием»); через подписку — целиком за 0,8 с; через свой
+  # узел — Cloudflare встречает проверкой. Нужен заголовок как у JacRed
+  # (User-Agent Chrome): голый curl получает проверку на любом пути.
+  #
+  # JacRed выбран вместо Jackett, потому что трекеры за Cloudflare Jackett не
+  # брал никаким маршрутом: через подписку — IP дата-центра, проверку не
+  # проходят ни FlareSolverr, ни Byparr; напрямую — режут по SNI; через свой
+  # узел — nnmclub.to открывался, но rutracker.org требовал проверку на каждой
+  # странице. JacRed сам к трекерам не ходит, только к серверу синхронизации.
+  - DOMAIN-SUFFIX,jacred.stream,Свободный интернет
   - OR,((DOMAIN-SUFFIX,gql.twitch.tv),(DOMAIN-SUFFIX,usher.ttvnw.net)),Свободный интернет # Разблокировка высокого качества на Twitch.tv
   # Панель и API Hetzner: под MATCH,DIRECT они грузятся мучительно долго, а
   # ими управляется свой же выходной узел — то есть именно то, чем починяют
@@ -721,6 +734,11 @@ rules:
   - RULE-SET,ubisoft,Ubisoft
   - RULE-SET,mihoyo,Mihoyo
   - RULE-SET,games-proxy,Игры (прокси)
+  # CD PROJEKT: облачные сохранения Ведьмака (game-saves.live.cdpred.services)
+  # напрямую из РФ не выгружаются. Проверка; при успехе — в rules/games-proxy.yaml.
+  - DOMAIN-SUFFIX,cdpred.services,Игры (прокси)
+  - DOMAIN-SUFFIX,cdprojektred.com,Игры (прокси)
+  - DOMAIN-SUFFIX,gog.com,Игры (прокси)
   - RULE-SET,others,OTHERS
   - RULE-SET,refilter-domains,Свободный интернет
   - RULE-SET,refilter-ips,Свободный интернет
