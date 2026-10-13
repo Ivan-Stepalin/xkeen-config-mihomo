@@ -188,6 +188,22 @@ proxies:
       public-key: ${NODE_S_PBK_V}
       short-id: ${NODE_S_SID_V}
 
+  # Резидентский прокси proxy.market, Турция, только для PlayStation: домашний
+  # турецкий IP вместо дата-центра. Порт из диапазона 10000-10999 задаёт
+  # сессию, но адрес у сессии плавает: 13.10.2026 на 10000 был сначала Türk
+  # Telekom в Стамбуле, вечером — в Анкаре. Тариф пробный: 100 МБ до
+  # 12.11.2026 — на закачку игр не хватит, подробнее в README.
+  #
+  # Реквизиты здесь остаются плейсхолдерами и в рабочем файле: их подставляет
+  # scripts/deploy при отправке на роутер.
+  - name: Турция (резидентский)
+    type: socks5
+    server: ${TR_RES_SERVER}
+    port: 10000
+    username: ${TR_RES_USER}
+    password: ${TR_RES_PASS}
+    udp: true
+
 # ══════════════════════════════════════════════════════════════════════
 proxy-groups:
   # Свой VPS: автовыбор среди его транспортов. Смысл в том, что при блокировке
@@ -385,9 +401,11 @@ proxy-groups:
     name: TikTok
     icon: https://github.com/amatol/xkeen-configuration/raw/refs/heads/main/group-icons/tiktok.png
 
+  # Турция первой: группа по умолчанию идёт через неё, остальное — запас.
   - <<: *select
     name: PlayStation
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/PlayStation.png
+    proxies: [Турция (резидентский), Выход, Свой узел, Свободный интернет, Подписка, DIRECT]
 
   - <<: *select
     name: Nintendo
