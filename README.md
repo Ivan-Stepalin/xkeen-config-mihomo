@@ -17,7 +17,7 @@ Claude Code плюс замеры, объясняющие каждое его о
 | `config.yaml` | конфигурация mihomo целиком: группы, правила, узлы |
 | `rules/` | списки доменов для `rule-provider`'ов |
 | `node/` | свой выходной узел: объявление состояния и скрипты |
-| `scripts/` | валидатор, гео-проба и фильтры для секретов |
+| `scripts/` | заливка на роутер, валидатор, гео-проба и фильтры для секретов |
 | `port_proxying.lst` | порты, которые xkeen отдаёт в mihomo |
 | `.secrets.yaml` | реальные значения секретов, в git не уходит |
 | `OWN-NODE.md` | как поднять такой узел с нуля: промпт и замеры |
@@ -41,6 +41,24 @@ xkeen перехватывает перечисленные порты и отд
 адрес удобно смотреть, что реально выбрано в группах:
 
     curl -s http://192.168.1.1:9090/proxies
+
+## Залить на роутер
+
+    scripts/deploy            проверить, залить, перечитать конфиг через API
+    scripts/deploy --restart  то же, но через `xkeen -restart`
+
+Сначала гоняет валидатор и `mihomo -t`, потом кладёт `config.yaml` в
+`/opt/etc/mihomo/` (предыдущий остаётся рядом как `config.yaml.prev`) и просит
+mihomo перечитать его без перезапуска. `--restart` нужен, когда меняются порты,
+`external-controller`, слушатель DNS или `tun` — это читается только при старте.
+Доступ по ключу на dropbear из Entware. Ключ кладётся один раз, и не через
+`ssh-copy-id`: dropbear в Entware собран с патчем OpenWrt и для root читает
+только `/opt/etc/dropbear/authorized_keys`, а на `~/.ssh/authorized_keys`
+отказывает молча.
+
+    ssh -p 222 root@192.168.1.1 'mkdir -p /opt/etc/dropbear && chmod 700 /opt/etc/dropbear \
+      && cat >> /opt/etc/dropbear/authorized_keys && chmod 600 /opt/etc/dropbear/authorized_keys' \
+      < ~/.ssh/id_ed25519.pub
 
 ## Проверить перед заливкой
 
