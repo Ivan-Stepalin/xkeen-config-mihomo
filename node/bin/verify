@@ -15,6 +15,7 @@ Protocols — и при этом не передавать ничего. Обр�
 кода, что блок для config.yaml. Значит проверяется ровно то, что поедет
 в прод, включая имена полей xhttp-opts.
 """
+import json
 import os
 import pathlib
 import re
@@ -48,12 +49,25 @@ def ok(m):  print(f"{GREEN}  ✓{RESET} {m}")
 def bad(m): print(f"{RED}  ✗{RESET} {m}")
 
 
-def node_ip(conf):
-    r = subprocess.run(["hcloud", "server", "ip", conf["SERVER_NAME"]],
-                       capture_output=True, text=True)
+def node_state(conf):
+    """IP узла и список заблокированных провайдером адресов.
+
+    Блокировку спрашиваем ДО замера, потому что снаружи она выглядит ровно как
+    авария узла: молчат все порты, теряется icmp, ssh не отвечает с
+    разрешённого адреса. 01.09.2026 на выяснение этого ушёл час диагностики —
+    узел был полностью исправен, а ответ лежал в одном поле API. Замер в таком
+    состоянии не покажет ничего, кроме тишины, и потому бесполезен.
+    """
+    r = subprocess.run(["hcloud", "server", "describe", conf["SERVER_NAME"],
+                        "-o", "json"], capture_output=True, text=True)
     if r.returncode != 0:
-        die("не смог узнать IP узла через hcloud")
-    return r.stdout.strip()
+        die(f"не смог опросить узел {conf['SERVER_NAME']} через hcloud")
+    net = json.loads(r.stdout).get("public_net", {})
+    ip = (net.get("ipv4") or {}).get("ip")
+    if not ip:
+        die("у узла нет публичного IPv4")
+    blocked = [k for k in ("ipv4", "ipv6") if (net.get(k) or {}).get("blocked")]
+    return ip, blocked
 
 
 def write_client_config(kind, conf, keys, ip, uuid, path):
@@ -145,7 +159,14 @@ def main():
     if not clients:
         die("нет ни одного клиента")
     uuid = clients[0][1]
-    ip = node_ip(conf)
+    ip, blocked = node_state(conf)
+    if blocked:
+        die(f"""адреса узла заблокированы провайдером: {", ".join(blocked)}
+
+    Узел тут ни при чём: замер покажет тишину на всех портах, что бы на нём
+    ни стояло. Блокировка снимается только на стороне провайдера — смотри
+    почту аккаунта Hetzner и раздел IPs в панели. Проверить флаг напрямую:
+        hcloud server describe {conf["SERVER_NAME"]} -o json""")
 
     kinds = sys.argv[1:] or ["xhttp", "vision"]
     for k in kinds:

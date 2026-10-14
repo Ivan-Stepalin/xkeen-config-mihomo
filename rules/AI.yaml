@@ -14,3 +14,5 @@ payload:
   - DOMAIN-SUFFIX,clients4.google.com
   - DOMAIN-SUFFIX,gstatic.com
   - DOMAIN-KEYWORD,alkali
+  - DOMAIN-SUFFIX,logrocket.com
+  - DOMAIN-SUFFIX,logrocket.io
