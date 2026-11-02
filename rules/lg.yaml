@@ -20,6 +20,7 @@ payload:
   - DOMAIN-SUFFIX,lgthinq.com
   - DOMAIN-SUFFIX,lgeapi.com
   - DOMAIN-SUFFIX,lgsmartad.com
+  - DOMAIN-SUFFIX,wiselg.com
 
   # === Новые домены SDP (Smart Delivery Platform) — соглашения, EULA, account ===
   - DOMAIN-SUFFIX,nextlgsdp.com
