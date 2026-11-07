@@ -512,11 +512,6 @@ rule-providers:
     url: https://raw.githubusercontent.com/Ivan-Stepalin/xkeen-config-mihomo/main/rules/AI.yaml
     path: ./rule-providers/ai-custom.yaml
 
-  antigravity:
-    <<: *yaml-classical
-    url: https://raw.githubusercontent.com/Ivan-Stepalin/xkeen-config-mihomo/main/rules/antigravity.yaml
-    path: ./rule-providers/antigravity.yaml
-
   lg:
     <<: *yaml-classical
     url: https://raw.githubusercontent.com/Ivan-Stepalin/xkeen-config-mihomo/main/rules/lg.yaml
@@ -711,10 +706,6 @@ rules:
   - GEOSITE,youtube,YouTube
   - GEOSITE,google,Google
   - OR,((DOMAIN-SUFFIX,clients6.google.com),(DOMAIN-SUFFIX,ogs.google.com)),Google
-  # Antigravity: его не-гугловые домены (antigravity-unleash.goog и др.) раньше
-  # уходили через AI-custom в группу AI, то есть другим выходом, чем остальная
-  # сессия Google. Список — rules/antigravity.yaml.
-  - RULE-SET,antigravity,Google
   # Остальные AI: Claude, ChatGPT и прочие. Домены Google сюда уже не дойдут —
   # их забрали правила выше.
   - GEOSITE,category-ai-!cn,AI

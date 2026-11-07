@@ -11,3 +11,11 @@ payload:
   - DOMAIN-KEYWORD,alkali
   - DOMAIN-SUFFIX,logrocket.com
   - DOMAIN-SUFFIX,logrocket.io
+  # Antigravity (IDE Google)
+  - DOMAIN-SUFFIX,antigravity.google
+  - DOMAIN-SUFFIX,antigravity-unleash.goog
+  - DOMAIN-KEYWORD,antigravity
+  - DOMAIN-KEYWORD,cloudcode-pa
+  - DOMAIN-SUFFIX,generativelanguage.googleapis.com
+  - DOMAIN-SUFFIX,oauth2.googleapis.com
+  - DOMAIN-SUFFIX,accounts.google.com
