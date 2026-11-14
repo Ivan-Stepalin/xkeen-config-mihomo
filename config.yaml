@@ -53,6 +53,27 @@ sniffer:
       override-destination: true
     TLS:
       ports: [443, 8443]
+      override-destination: true
+
+# DNS используется, когда для группы выбран выход «Перевал (DNS)» (type: direct).
+# Пока группа смотрит в VLESS-туннель (Подписка 1/2 или Свой узел), имя домена
+# уезжает на удалённый сервер и этот блок не участвует. Когда выбран
+# «Перевал (DNS)», mihomo резолвит домены нейросетей и Google через DNS
+# Перевала (153.80.200.170) и соединяется с его SNI-прокси напрямую.
+dns:
+  enable: true
+  ipv6: false
+  default-nameserver:
+    - 127.0.0.1
+  nameserver:
+    - 127.0.0.1
+  nameserver-policy:
+    "geosite:google,category-ai-!cn":
+      - 153.80.200.170
+      - https://free.pereval.top/dns-query
+    "+.antigravity.google,+.antigravity-unleash.goog,+.cursor.com,+.cursor.sh,+.cursorapi.com,+.windsurf.com,+.codeium.com,+.openrouter.ai,+.groq.com,+.deepl.com,+.jetbrains.com,+.x.ai,+.grok.com,+.githubcopilot.com":
+      - 153.80.200.170
+      - https://free.pereval.top/dns-query
 
 # ══════════════════════════════════════════════════════════════════════
 # ШАБЛОНЫ
@@ -66,11 +87,10 @@ sniffer:
 # Как добавить rule-provider: см. комментарий над rule-providers
 # ══════════════════════════════════════════════════════════════════════
 x-templates:
-  # Группа: узлы подписки + ручной выбор запасных вариантов.
+  # Группа: компактный ручной выбор из верхнеуровневых выходов.
   select: &select
     type: select
-    use: [subscription]
-    proxies: [Выход, Свой узел, Свободный интернет, Подписка, Подписка YouNet, DIRECT]
+    proxies: [Прокси по умолчанию, Свой узел, Подписка 1, Подписка 2, Перевал (DNS), DIRECT]
 
   # Подписка: общие поля, различаются только url, path и префикс имён.
   provider: &provider
@@ -83,14 +103,16 @@ x-templates:
       interval: 120
 
   # Группа: автовыбор быстрейшего узла внутри одной подписки.
-  # Без lazy: false — узлы тестируются только когда группа реально выбрана,
-  # иначе роутер гонял бы health-check по всем узлам подписки лишний раз.
+  # Семейство nv (блокируется Google петлёй GOOGLE_ABUSE) и российские выходы
+  # (🇷🇺) исключены из автовыбора, чтобы url-test не садился на них из-за
+  # минимального пинга.
   sub-test: &sub-test
     type: url-test
     url: https://cp.cloudflare.com/generate_204
     expected-status: 204
     interval: 120
     tolerance: 50
+    exclude-filter: "(?i)(nv [0-9]|\U0001F1F7\U0001F1FA)"
 
   # rule-provider: скомпилированный .mrs со списком доменов.
   mrs-domain: &mrs-domain
@@ -210,11 +232,27 @@ proxies:
     password: ${TR_RES_PASS}
     udp: true
 
+  # Запасной выход для нейросетей и Google через бесплатный Smart DNS «Перевал»
+  # (https://pereval.top). Резолвит домены из dns.nameserver-policy через
+  # 153.80.200.170 и отправляет TLS-трафик напрямую на SNI-прокси Перевала.
+  - name: Перевал (DNS)
+    type: direct
+
 # ══════════════════════════════════════════════════════════════════════
 proxy-groups:
-  # Свой VPS: автовыбор среди его транспортов. Смысл в том, что при блокировке
-  # одного транспорта группа сама переходит на другой — узел один, путей до
-  # него пять, и ТСПУ приходится ломать каждый отдельно.
+  # РУБИЛЬНИК. Стоит первым в панели и первым вариантом в шаблоне *select,
+  # поэтому все сервисные группы по умолчанию смотрят сюда, а не на
+  # конкретный выход. Смысл: переключить весь трафик между подписками и своим
+  # узлом одним движением, не обходя тридцать групп руками.
+  #
+  # У Google свой выбор выхода, потому что Gemini сверяет страну по сессии целиком.
+  - name: Прокси по умолчанию
+    type: select
+    proxies: [Подписка 1, Подписка 2, Свой узел, Перевал (DNS), DIRECT]
+    icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Rocket.png
+
+  # Свой VPS: автовыбор среди его транспортов. При блокировке одного
+  # транспорта группа сама переходит на другой.
   - name: Свой узел
     type: url-test
     url: https://cp.cloudflare.com/generate_204
@@ -225,66 +263,18 @@ proxy-groups:
     proxies: [Свой узел XHTTP, Свой узел Vision]
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Server.png
 
-  # Автовыбор быстрейшего узла подписки. Используется как «прокси по
-  # умолчанию» в шаблоне *select, поэтому объявлен первым.
-  - name: Свободный интернет
-    type: url-test
-    url: https://cp.cloudflare.com/generate_204
-    expected-status: 204
-    interval: 120
-    tolerance: 50
+  # Первая подписка: автовыбор быстрейшего узла (без семейства nv и РФ).
+  - <<: *sub-test
+    name: Подписка 1
     lazy: false
-    icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Available_1.png
-    # Только узлы подписки. Было include-all: true, а оно втягивает и узлы,
-    # описанные в proxies: — то есть оба входа своего узла попадали в этот
-    # автопул вторым путём, хотя «Свой узел» и так стоит первым вариантом в
-    # каждой группе.
-    #
-    # С 14.11.2026 подписок две, поэтому провайдер назван явно. Раньше стояло
-    # include-all-providers: true, и оно втянуло бы в автопул узлы YouNet, а
-    # у них свой отдельный вход — группа «Подписка YouNet».
-    use: [subscription]
-    # Семейство nv — самое быстрое, поэтому url-test выбирал именно его, и на
-    # него садились все сервисы Google, кроме группы AI. Google блокирует эти
-    # IP (петля GOOGLE_ABUSE), из-за чего Gemini падал на заглушку про страну
-    # уже после загрузки страницы. Российские выходы исключены по той же
-    # причине. Узлы остаются доступны для выбора вручную в любой группе.
-    exclude-filter: "(?i)(nv [0-9]|\U0001F1F7\U0001F1FA)"
-
-  # Автовыбор по подписке без изъятий. Отличается от «Свободного интернета»
-  # тем, что не отбрасывает семейство nv и российские выходы — нужен, когда
-  # надо дотянуться именно до них, не выбирая узел руками.
-  - <<: *sub-test
-    name: Подписка
-    use: [subscription]
+    use: [sub1]
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Server.png
 
-  # Вторая подписка, YouNet: автовыбор быстрейшего узла внутри неё. Стоит
-  # отдельно от «Свободного интернета» — это самостоятельный вход, а не
-  # пополнение общего пула.
+  # Вторая подписка: автовыбор быстрейшего узла (без РФ).
   - <<: *sub-test
-    name: Подписка YouNet
-    use: [younet]
+    name: Подписка 2
+    use: [sub2]
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Server.png
-
-  # РУБИЛЬНИК. Первый вариант в шаблоне *select, поэтому все сервисные группы
-  # по умолчанию смотрят сюда, а не на конкретный выход. Смысл: переключить
-  # весь трафик со подписки на свой узел и обратно одним движением, не
-  # обходя тридцать групп руками.
-  #
-  # Google сюда намеренно НЕ заведён: у него свой «Google-выход», потому что
-  # Gemini сверяет страну по сессии целиком и рассогласованные выходы дают
-  # заглушку про страну. Рубильник дёргает всё остальное, Google остаётся
-  # на своей схеме.
-  #
-  # Внимание при заливке на роутер: profile.store-selected: true, то есть
-  # ранее сделанный вручную выбор в группе сохраняется и перекрывает новое
-  # значение по умолчанию. В группах, где вы уже выбирали выход руками,
-  # «Выход» придётся выбрать один раз.
-  - name: Выход
-    type: select
-    proxies: [Свободный интернет, Свой узел, Подписка, Подписка YouNet, DIRECT]
-    icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Rocket.png
 
   - <<: *select
     name: YouTube
@@ -294,9 +284,6 @@ proxy-groups:
     name: Discord
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Discord.png
 
-  - <<: *select
-    name: Twitch
-    icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Twitch.png
 
   - <<: *select
     name: Кинотеатры
@@ -318,126 +305,38 @@ proxy-groups:
     name: Telegram
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Telegram.png
 
-  - <<: *select
-    name: Community
-    icon: https://github.com/amatol/xkeen-configuration/raw/refs/heads/main/group-icons/community.png
 
-  # Панель и API Hetzner. Своя группа, а не «Свободный интернет» жёстко:
-  # этим управляется сам выходной узел, и когда он падает, выбор выхода для
-  # панели нужен под рукой. Порядок вариантов обратный шаблонному — первым
-  # стоит «Свободный интернет», потому что смысл группы в том, чтобы панель
-  # открывалась быстро, а свой узел в такой момент обычно и есть проблема.
-  - <<: *select
-    name: Hetzner
-    icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Server.png
-    proxies: [Свободный интернет, Подписка, Подписка YouNet, Выход, Свой узел, DIRECT]
 
   # PASS — передать решение следующему правилу вместо отправки в прокси.
   - <<: *select
     name: Cloudflare
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Cloudflare.png
-    proxies: [PASS, Выход, Свой узел, Свободный интернет, Подписка, Подписка YouNet, DIRECT]
+    proxies: [PASS, Прокси по умолчанию, Свой узел, Подписка 1, Подписка 2, Перевал (DNS), DIRECT]
 
-  # У Google и у остальных AI-сервисов требования к выходу разные и
-  # несовместимые, поэтому групп две, а не одна.
-  #
-  # Google определяет страну по своей гео-базе, а не по тому, где физически
-  # стоит сервер, и почти всю подписку считает российской. Для Gemini это
-  # заглушка «не поддерживается в вашей стране». Годных узлов единицы, и
-  # список приходится держать руками (см. Google-авто ниже).
-  #
-  # Claude, ChatGPT и прочим достаточно любого быстрого нероссийского узла:
-  # проверено 26.08.2026, api.anthropic.com и api.openai.com отвечают 401
-  # (то есть пускают) через все узлы подписки A, включая те, что Google
-  # считает российскими.
-  #
-  # Пока обе задачи решала одна группа AI, узкий и хрупкий список под Google
-  # управлял выходом и для Claude: когда закреплённый узел умирал (так вышло
-  # с Netherlands Lt 1), вместе с Gemini отваливались Claude и ChatGPT.
-  # Разделение убирает эту связь: смерть узла в Google-выходе больше не
-  # касается остальных сервисов.
-
-  # Автовыбор среди узлов, которые Google считает нероссийскими.
-  #
-  # Белый список, а не чёрный: Google относит IP к странам произвольно, и по
-  # названию узла предсказать вердикт нельзя — Poland n1 и n2 для него
-  # российские, а n3, n4, n6, n7 нет, при одном провайдере и одной стране в
-  # имени. Проверено перебором 26.08.2026: из живых узлов подписки A годны
-  # шесть — четыре польских (~85 мс, Google видит PL), India (168 мс, IN) и
-  # Singapore (276 мс, US). Netherlands Lt 1 в списке седьмым: утром он был
-  # годен (NL), к вечеру умер; fallback мёртвые пропускает, так что пусть
-  # лежит запасным. Из 88 узлов подписки B живы 14, и все, кроме трёх
-  # американских, для Google российские — включая немецкие и шведские, про
-  # которые раньше думали обратное. Американские не взяты намеренно: 570-630 мс
-  # и Gemini на них отдаёт обрезанный ответ вместо страницы.
-  #
-  # Список стареет при любой замене или переименовании узлов у провайдера.
-  # Обновить: ruby scripts/probe-google.rb — он опрашивает Google через
-  # каждый узел и печатает готовую строку filter.
-  #
-  # fallback, а не url-test: url-test гонится за скоростью и переключал бы
-  # узел каждые 120 секунд прямо посреди диалога — для Google это смена
-  # страны в рамках одной сессии и повод снова показать заглушку. fallback
-  # держится за первый живой узел по порядку и меняет его только при смерти.
-  # Порядок здесь — порядок узлов в подписке: сначала польские (~85 мс),
-  # India, Singapore и Lt 1 идут после и включаются только если польские умрут.
-  # lazy: false — иначе группа не знает, какие узлы живы, до первого запроса,
-  # и первый же диалог уходит в мёртвый узел.
-  - name: Google-авто
-    type: fallback
-    url: https://cp.cloudflare.com/generate_204
-    expected-status: 204
-    interval: 60
-    lazy: false
-    # Свой узел стоит первым: fallback держится за него, пока он жив, и
-    # уходит в подписочный белый список только если VPS умрёт. Ручной
-    # список ниже поэтому больше не критичен, но остаётся страховкой.
-    proxies: [Свой узел]
-    use: [subscription]
-    filter: "(?i)(Poland n[3467]|India|Singapore|Netherlands Lt 1)"
-    icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Google_Search.png
-
-  # Выход для Google с ручным выбором. По умолчанию стоит «Google-авто» —
-  # прежняя автоматика по белому списку, поведение то же, что было. Ниже в
-  # списке — обе подписки целиком: их автогруппы и каждый узел поштучно.
-  #
-  # Выбирая руками, помните, зачем существует белый список: семейство nv и
-  # российские выходы Google блокирует (петля GOOGLE_ABUSE), и Gemini на них
-  # показывает заглушку про страну. Сам выбор хранится на роутере
-  # (profile.store-selected) и переживает заливку конфига.
-  - name: Google-выход
+  # Вся сессия Google (поиск, аккаунты, Gemini, gstatic, аватарки) идёт
+  # отдельно от остальных AI: можно закрепить конкретную подписку или
+  # отдельный сервер из обеих подписок.
+  - name: Google
     type: select
-    proxies: [Google-авто, Свой узел, Подписка, Подписка YouNet]
-    use: [subscription, younet]
-    icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Google_Search.png
-
-  # Вся сессия Google: поиск, аккаунты, Gemini, gstatic, аватарки.
-  - <<: *select
-    name: Google
+    proxies: [Свой узел, Подписка 2, Подписка 1, Перевал (DNS), Прокси по умолчанию, DIRECT]
+    use: [sub1, sub2]
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Google.png
-    proxies: [Google-выход, Выход, Свой узел, Свободный интернет, Подписка, Подписка YouNet, DIRECT]
 
-  # Claude, ChatGPT и остальные AI, кроме Google. Здесь белый список не нужен:
-  # ограничение только одно — не российский IP, а его уже держит
-  # «Свободный интернет» своим exclude-filter.
+  # Claude, ChatGPT и остальные AI, кроме Google.
   - <<: *select
     name: AI
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Bot.png
-    proxies: [Выход, Свой узел, Свободный интернет, Подписка, Подписка YouNet, DIRECT]
 
   - <<: *select
     name: Twitter
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Twitter.png
 
-  - <<: *select
-    name: TikTok
-    icon: https://github.com/amatol/xkeen-configuration/raw/refs/heads/main/group-icons/tiktok.png
 
   # Турция первой: группа по умолчанию идёт через неё, остальное — запас.
   - <<: *select
     name: PlayStation
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/PlayStation.png
-    proxies: [Турция (резидентский), Выход, Свой узел, Свободный интернет, Подписка, Подписка YouNet, DIRECT]
+    proxies: [Турция (резидентский), Прокси по умолчанию, Свой узел, Подписка 1, Подписка 2, Перевал (DNS), DIRECT]
 
   - <<: *select
     name: Nintendo
@@ -471,9 +370,6 @@ proxy-groups:
     name: Ubisoft
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Game.png
 
-  - <<: *select
-    name: Mihoyo
-    icon: https://raw.githubusercontent.com/clash-verge-rev/icon-hub/main/mihoyo/ys.png
 
   - <<: *select
     name: Игры (прокси)
@@ -491,66 +387,55 @@ proxy-groups:
     proxies: [REJECT, PASS]
 
 # ══════════════════════════════════════════════════════════════════════
-# ПОДПИСКА
+# ПОДПИСКИ
 #
-# Две: основная (префикс «[A] ») и YouNet (префикс «[Y] », добавлена
-# 14.11.2026). Прежняя вторая (префикс «[B] ») убрана 27.08.2026; её ссылка
-# осталась в .secrets.yaml под ключом SUB_B — файл локальный, а других копий
-# нет.
+# Универсальные слоты sub1 («Подписка 1», префикс «[1] ») и sub2
+# («Подписка 2», префикс «[2] »). Ссылки хранятся в .secrets.yaml под
+# ключами SUB_1 и SUB_2.
 #
-#   path             файл кэша; у каждой подписки свой, иначе провайдеры
-#                    перезапишут файл друг друга;
-#   additional-prefix помечает узлы «[A] » и «[Y] », чтобы они не путались
-#                    между собой и с узлами своего сервера из proxies:.
+#   path              файл кэша; у каждой подписки свой, иначе провайдеры
+#                     перезапишут файл друг друга;
+#   additional-prefix помечает узлы «[1] » и «[2] », чтобы они не путались
+#                     между собой и с узлами своего сервера из proxies:.
 # ══════════════════════════════════════════════════════════════════════
 proxy-providers:
-  subscription:
+  sub1:
     <<: *provider
-    url: ${SUB_A}
-    path: ./proxy-providers/subscription.yaml
+    url: ${SUB_1}
+    path: ./proxy-providers/sub1.yaml
     override:
-      additional-prefix: "[A] "
+      additional-prefix: "[1] "
 
-  younet:
+  sub2:
     <<: *provider
-    url: ${SUB_YOU}
-    path: ./proxy-providers/younet.yaml
+    url: ${SUB_2}
+    path: ./proxy-providers/sub2.yaml
     override:
-      additional-prefix: "[Y] "
+      additional-prefix: "[2] "
 
 
 # ══════════════════════════════════════════════════════════════════════
-# RULE-PROVIDER'Ы
+# RULE-PROVIDER-Ы
 #
-# Новый провайдер — четыре строки (шаблон задаёт type/behavior/format/interval):
-#
-#   имя:
-#     <<: *mrs-domain
-#     url: https://…/что-то.mrs
-#     path: ./rule-providers/что-то.mrs
-#
-# Шаблон выбирается по формату источника:
-#   *mrs-domain      .mrs со списком доменов
-#   *mrs-ipcidr      .mrs со списком IP-подсетей
-#   *yaml-domain     .yaml, плоский список доменов
-#   *yaml-classical  .yaml с готовыми правилами
-#   *inline          правила прямо здесь, в payload
-#
-# Имя провайдера — то, что пишется в RULE-SET,<имя>,<группа>.
+# Доменные списки сервисов (YouTube, Google, Spotify, Steam, PlayStation и др.)
+# берутся напрямую из встроенной базы GeoSite.dat (GEOSITE,<имя>), чтобы не
+# плодить десятки отдельных .mrs-загрузок. Здесь объявлены только:
+#   1. собственные списки из папки rules/*.yaml этого репозитория;
+#   2. IP-подсети (telegram, meta, cloudflare);
+#   3. реестр РКН (re:filter) и списки торрентов;
+#   4. составное правило Discord (домены + голосовые UDP-порты).
 # ══════════════════════════════════════════════════════════════════════
 rule-providers:
-  # ── Собственные списки из этого репозитория ───────────────────────
-  # Правятся в rules/*.yaml, роутер подтягивает их с raw.githubusercontent.
-  # После push изменения приезжают в течение interval (сутки).
-  kino:
-    <<: *yaml-domain
-    url: https://raw.githubusercontent.com/Ivan-Stepalin/xkeen-config-mihomo/main/rules/kino.yaml
-    path: ./rule-providers/kino-domains.yaml
-
+  # ── Собственные списки из этого репозитория (rules/*.yaml) ────────
   AI-custom:
     <<: *yaml-classical
     url: https://raw.githubusercontent.com/Ivan-Stepalin/xkeen-config-mihomo/main/rules/AI.yaml
     path: ./rule-providers/ai-custom.yaml
+
+  kino:
+    <<: *yaml-domain
+    url: https://raw.githubusercontent.com/Ivan-Stepalin/xkeen-config-mihomo/main/rules/kino.yaml
+    path: ./rule-providers/kino-domains.yaml
 
   lg:
     <<: *yaml-classical
@@ -562,81 +447,17 @@ rule-providers:
     url: https://raw.githubusercontent.com/Ivan-Stepalin/xkeen-config-mihomo/main/rules/tcl.yaml
     path: ./rule-providers/tcl.yaml
 
-  mihoyo:
+  games-proxy:
     <<: *yaml-classical
-    url: https://raw.githubusercontent.com/Ivan-Stepalin/xkeen-config-mihomo/main/rules/mihoyo.yaml
-    path: ./rule-providers/mihoyo.yaml
+    url: https://raw.githubusercontent.com/Ivan-Stepalin/xkeen-config-mihomo/main/rules/games-proxy.yaml
+    path: ./rule-providers/games-proxy.yaml
 
   others:
     <<: *yaml-classical
     url: https://raw.githubusercontent.com/Ivan-Stepalin/xkeen-config-mihomo/main/rules/others.yaml
     path: ./rule-providers/others.yaml
 
-  games-proxy:
-    <<: *yaml-classical
-    url: https://raw.githubusercontent.com/Ivan-Stepalin/xkeen-config-mihomo/main/rules/games-proxy.yaml
-    path: ./rule-providers/games-proxy.yaml
-
-  # ВНИМАНИЕ: тянется .mrs, а не rules/community.yaml — правки в yaml
-  # ни на что не влияют, пока источник не переведён на format: yaml.
-  # Подробнее: scripts/validate.rb предупреждает об этом рассинхроне.
-  community:
-    <<: *mrs-domain
-    url: https://raw.githubusercontent.com/Ivan-Stepalin/xkeen-config-mihomo/main/rules/community.mrs
-    path: ./rule-providers/community-domains.mrs
-
-  # ── geosite от MetaCubeX ──────────────────────────────────────────
-  patreon:
-    <<: *mrs-domain
-    url: https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/patreon.mrs
-    path: ./rule-providers/patreon-domains.mrs
-
-  tiktok:
-    <<: *mrs-domain
-    url: https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/tiktok.mrs
-    path: ./rule-providers/tiktok-domains.mrs
-
-  microsoft:
-    <<: *mrs-domain
-    url: https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/microsoft.mrs
-    path: ./rule-providers/microsoft-domains.mrs
-
-  playstation:
-    <<: *mrs-domain
-    url: https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/playstation.mrs
-    path: ./rule-providers/playstation-domains.mrs
-
-  nintendo:
-    <<: *mrs-domain
-    url: https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/nintendo.mrs
-    path: ./rule-providers/nintendo-domains.mrs
-
-  steam:
-    <<: *mrs-domain
-    url: https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/steam.mrs
-    path: ./rule-providers/steam-domains.mrs
-
-  epicgames:
-    <<: *mrs-domain
-    url: https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/epicgames.mrs
-    path: ./rule-providers/epicgames-domains.mrs
-
-  ea:
-    <<: *mrs-domain
-    url: https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/ea.mrs
-    path: ./rule-providers/ea-domains.mrs
-
-  ubisoft:
-    <<: *mrs-domain
-    url: https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/ubisoft.mrs
-    path: ./rule-providers/ubisoft-domains.mrs
-
-  # ── geoip от MetaCubeX и сторонние IP-списки ──────────────────────
-  cloudflare-ips:
-    <<: *mrs-ipcidr
-    url: https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geoip/cloudflare.mrs
-    path: ./rule-providers/cloudflare-ips.mrs
-
+  # ── IP-подсети (Telegram, Meta, Cloudflare) ───────────────────────
   telegram-ips:
     <<: *mrs-ipcidr
     url: https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geoip/telegram.mrs
@@ -646,6 +467,11 @@ rule-providers:
     <<: *mrs-ipcidr
     url: https://github.com/zxc-rv/assets/raw/refs/heads/main/rules/meta-ips.mrs
     path: ./rule-providers/meta-ips.mrs
+
+  cloudflare-ips:
+    <<: *mrs-ipcidr
+    url: https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geoip/cloudflare.mrs
+    path: ./rule-providers/cloudflare-ips.mrs
 
   # ── re:filter (реестр РКН) и торренты, legiz-ru ───────────────────
   refilter-domains:
@@ -668,13 +494,7 @@ rule-providers:
     url: https://github.com/legiz-ru/mihomo-rule-sets/raw/main/other/torrent-clients.yaml
     path: ./rule-providers/torrent-clients.yaml
 
-  # ── Правила, заданные прямо здесь ─────────────────────────────────
-  steam-chat:
-    <<: *inline
-    payload:
-      - DOMAIN-SUFFIX,steamcommunity.com
-      - DOMAIN-SUFFIX,steam-chat.com
-
+  # ── Составное правило Discord (домены + голосовые порты) ──────────
   discord:
     <<: *inline
     payload:
@@ -692,96 +512,44 @@ rule-providers:
 # ПРАВИЛА
 #
 # ПОРЯДОК ЗНАЧИМ: побеждает первое совпадение, остальные не проверяются.
-# Узкое правило должно стоять выше широкого, иначе широкое его перекроет
-# (так nintendo-домены больше года уходили в Community вместо Nintendo).
-#
 # Проверить порядок и ссылки: ruby scripts/validate.rb
 # ══════════════════════════════════════════════════════════════════════
 rules:
-  # Первым правилом: туннель до своего узла идёт напрямую. Иначе соединение
-  # телефона к узлу поехало бы внутри чужого подписочного прокси — лишний
-  # крюк, лишняя задержка и ещё одна точка отказа. no-resolve — адрес и так
-  # известен, DNS для него не нужен.
+  # ── Системные ─────────────────────────────────────────────────────
   - IP-CIDR,${NODE_S_IP}/32,DIRECT,no-resolve
   - AND,((DST-PORT,443),(NETWORK,UDP)),QUIC
-  # Сервер синхронизации JacRed — индексера торрентов для Lampa (LXC 103 на
-  # Proxmox, 192.168.1.58:9118). Замер 06.10.2026, порция базы 3,5 МБ:
-  # напрямую — 21 КБ за 150 с и обрыв (душат после первого окна TCP, см.
-  # «Проверять скачиванием»); через подписку — целиком за 0,8 с; через свой
-  # узел — Cloudflare встречает проверкой. Нужен заголовок как у JacRed
-  # (User-Agent Chrome): голый curl получает проверку на любом пути.
-  #
-  # JacRed выбран вместо Jackett, потому что трекеры за Cloudflare Jackett не
-  # брал никаким маршрутом: через подписку — IP дата-центра, проверку не
-  # проходят ни FlareSolverr, ни Byparr; напрямую — режут по SNI; через свой
-  # узел — nnmclub.to открывался, но rutracker.org требовал проверку на каждой
-  # странице. JacRed сам к трекерам не ходит, только к серверу синхронизации.
-  - DOMAIN-SUFFIX,jacred.stream,Свободный интернет
-  - OR,((DOMAIN-SUFFIX,gql.twitch.tv),(DOMAIN-SUFFIX,usher.ttvnw.net)),Свободный интернет # Разблокировка высокого качества на Twitch.tv
-  # Панель и API Hetzner: под MATCH,DIRECT они грузятся мучительно долго, а
-  # ими управляется свой же выходной узел — то есть именно то, чем починяют
-  # VPN, когда VPN не работает. Своего узла тут быть не может: он занят
-  # правилом IP-CIDR выше и остаётся DIRECT, что и нужно — туннель до него
-  # не должен ехать внутри чужого прокси. web-console.hetzner.cloud в этом
-  # же наборе: VNC-консоль сервера идёт через него.
-  - OR,((DOMAIN-SUFFIX,hetzner.com),(DOMAIN-SUFFIX,hetzner.cloud),(DOMAIN-SUFFIX,hetzner.de)),Hetzner
-  # Вся сессия Google — одним выходом.
-  #
-  # Gemini сверяет страну не по одному запросу, а по сессии целиком. Пока
-  # домены расходились по группам, браузер уходил в Google через четыре узла
-  # в трёх странах разом (проверено захватом 26.08.2026: gemini — Нидерланды,
-  # www.google.com — Польша, play/photos — Латвия, lh3.googleusercontent.com —
-  # заблокированный nv 1 через группу YouTube). Google считал такую сессию
-  # несогласованной и возвращал заглушку про страну уже после загрузки чата.
-  #
-  # Правила Google стоят ВЫШЕ правил остальных AI намеренно: и
-  # GEOSITE,category-ai-!cn, и RULE-SET,AI-custom содержат gemini.google.com,
-  # accounts.google.com, gstatic.com и бэкенд alkali…clients6. Стой они выше,
-  # домены Gemini ушли бы в группу AI, к Claude и ChatGPT, — то есть на узел,
-  # который Google почти наверняка считает российским.
-  #
-  # YouTube выше Google: видеотрафик остаётся на своей группе и не утягивается
-  # на узел Google. googleusercontent.com здесь намеренно НЕ упомянут —
-  # аватарки нужны в сессии Google, их забирает правило ниже.
+
+  # ── Google и AI (YouTube выше Google, Google выше общих AI) ───────
   - GEOSITE,youtube,YouTube
-  - GEOSITE,google,Google
-  - OR,((DOMAIN-SUFFIX,clients6.google.com),(DOMAIN-SUFFIX,ogs.google.com)),Google
-  # Остальные AI: Claude, ChatGPT и прочие. Домены Google сюда уже не дойдут —
-  # их забрали правила выше.
-  - GEOSITE,category-ai-!cn,AI
-  - RULE-SET,AI-custom,AI
-  - GEOSITE,spotify,Spotify
-  - GEOSITE,twitch,Twitch
-  - GEOSITE,twitter,Twitter
+  - OR,((GEOSITE,google),(DOMAIN-SUFFIX,clients6.google.com),(DOMAIN-SUFFIX,ogs.google.com),(DOMAIN-SUFFIX,antigravity.google),(DOMAIN-SUFFIX,antigravity-unleash.goog),(DOMAIN-KEYWORD,antigravity)),Google
+  - OR,((GEOSITE,category-ai-!cn),(RULE-SET,AI-custom)),AI
+
+  # ── Соцсети, мессенджеры и медиа ──────────────────────────────────
   - RULE-SET,discord,Discord
-  - OR,((GEOSITE,meta),(RULE-SET,meta-ips,no-resolve)),Meta
-  - RULE-SET,microsoft,Microsoft
   - OR,((GEOSITE,telegram),(RULE-SET,telegram-ips,no-resolve)),Telegram
-  - OR,((GEOSITE,cloudflare),(RULE-SET,cloudflare-ips)),Cloudflare
+  - OR,((GEOSITE,meta),(RULE-SET,meta-ips,no-resolve)),Meta
+  - GEOSITE,twitter,Twitter
+  - GEOSITE,spotify,Spotify
   - RULE-SET,kino,Кинотеатры
-  - IP-CIDR,172.235.195.23/32,Nintendo,no-resolve
-  - RULE-SET,nintendo,Nintendo
-  - RULE-SET,community,Community
-  - RULE-SET,tiktok,TikTok
-  - RULE-SET,patreon,Свободный интернет
-  - RULE-SET,playstation,PlayStation
+  - GEOSITE,microsoft,Microsoft
+
+  # ── Телевизоры и консоли ──────────────────────────────────────────
   - RULE-SET,lg,LG
   - RULE-SET,tcl,TCL
-  - RULE-SET,steam-chat,Steam (чат и голос)
-  - RULE-SET,steam,Steam
-  - RULE-SET,epicgames,Epic Games
-  - RULE-SET,ea,EA
-  - RULE-SET,ubisoft,Ubisoft
-  - RULE-SET,mihoyo,Mihoyo
+  - GEOSITE,playstation,PlayStation
+  - OR,((IP-CIDR,172.235.195.23/32,no-resolve),(GEOSITE,nintendo)),Nintendo
+
+  # ── Игры на ПК (чат Steam стоит выше общего правила Steam) ────────
+  - OR,((DOMAIN-SUFFIX,steamcommunity.com),(DOMAIN-SUFFIX,steam-chat.com)),Steam (чат и голос)
+  - GEOSITE,steam,Steam
+  - GEOSITE,epicgames,Epic Games
+  - GEOSITE,ea,EA
+  - GEOSITE,ubisoft,Ubisoft
   - RULE-SET,games-proxy,Игры (прокси)
-  # CD PROJEKT: облачные сохранения Ведьмака (game-saves.live.cdpred.services)
-  # напрямую из РФ не выгружаются. Проверка; при успехе — в rules/games-proxy.yaml.
-  - DOMAIN-SUFFIX,cdpred.services,Игры (прокси)
-  - DOMAIN-SUFFIX,cdprojektred.com,Игры (прокси)
-  - DOMAIN-SUFFIX,gog.com,Игры (прокси)
+
+  # ── Прочее, Cloudflare, реестр РКН и торренты ─────────────────────
   - RULE-SET,others,OTHERS
-  - RULE-SET,refilter-domains,Свободный интернет
-  - RULE-SET,refilter-ips,Свободный интернет
-  - RULE-SET,torrent-clients,DIRECT
-  - RULE-SET,torrent-trackers,DIRECT
+  - OR,((GEOSITE,cloudflare),(RULE-SET,cloudflare-ips,no-resolve)),Cloudflare
+  - OR,((RULE-SET,refilter-domains),(RULE-SET,refilter-ips,no-resolve)),Прокси по умолчанию
+  - OR,((RULE-SET,torrent-clients),(RULE-SET,torrent-trackers)),DIRECT
   - MATCH,DIRECT

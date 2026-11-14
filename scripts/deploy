@@ -50,7 +50,7 @@ api() { curl -s -m 8 "$@"; }
 # На роутер уходит config.yaml с подставленными плейсхолдерами. Обычно рабочий
 # файл и так содержит реальные значения (их возвращает smudge-фильтр), но часть
 # реквизитов держится плейсхолдерами и на диске — см. «Турция (резидентский)».
-WORK="$(mktemp -d -t deploy)"; trap 'rm -rf "$WORK"' EXIT
+WORK="$(mktemp -d -t deploy.XXXXXX)"; trap 'rm -rf "$WORK"' EXIT
 CONF="$WORK/config.yaml"
 ruby scripts/unscrub.rb < config.yaml > "$CONF"
 if grep -n -E '\$\{[A-Z_]+\}' "$CONF"; then

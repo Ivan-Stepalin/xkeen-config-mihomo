@@ -161,7 +161,7 @@ clean.each { |(short, ms, gl)| printf("  %-44s %5d мс  %s\n", short, ms, gl) }
 META = /[.*+?^$()\[\]{}|\\\/]/.freeze
 
 alts = clean.map do |(short, _, _)|
-  bare = short.sub(/\A\[[AB]\]\s*/, '').gsub(/\p{So}|\p{Sk}/, '').strip
+  bare = short.sub(/\A\[[0-9A-Z]+\]\s*/, '').gsub(/\p{So}|\p{Sk}/, '').strip
   bare.gsub(META) { |ch| "\\#{ch}" }
 end
 puts

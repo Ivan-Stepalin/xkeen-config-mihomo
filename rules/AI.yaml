@@ -1,21 +1,7 @@
-# AI-custom: правила для AI-сервисов (Google Assistant и др.)
-# Политику задаёт RULE-SET,AI-custom,AI в config — выбор прокси в группе AI
+# AI-custom: дополнительные домены для AI-сервисов (кроме Google, который идёт в группу Google)
+# Политику задаёт RULE-SET,AI-custom,AI в config.yaml
 # behavior: classical, format: yaml
 payload:
-  - OR,((DOMAIN,assistant-s3-pa.googleapis.com),(DOMAIN,androidwearcloudsync-pa.googleapis.com))
   - DOMAIN-SUFFIX,requestly.io
-  - DOMAIN-SUFFIX,gemini.google.com
-  - DOMAIN-SUFFIX,optimizationguide-pa.googleapis.com
-  - DOMAIN-SUFFIX,clients4.google.com
-  - DOMAIN-SUFFIX,gstatic.com
-  - DOMAIN-KEYWORD,alkali
   - DOMAIN-SUFFIX,logrocket.com
   - DOMAIN-SUFFIX,logrocket.io
-  # Antigravity (IDE Google)
-  - DOMAIN-SUFFIX,antigravity.google
-  - DOMAIN-SUFFIX,antigravity-unleash.goog
-  - DOMAIN-KEYWORD,antigravity
-  - DOMAIN-KEYWORD,cloudcode-pa
-  - DOMAIN-SUFFIX,generativelanguage.googleapis.com
-  - DOMAIN-SUFFIX,oauth2.googleapis.com
-  - DOMAIN-SUFFIX,accounts.google.com

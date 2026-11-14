@@ -1,5 +1,4 @@
-# Игры, которые некорректно работают в РФ — трафик через прокси (Свободный интернет)
-# Добавляй сюда домены по одному в формате: - DOMAIN-SUFFIX,example.com
+# Игры, которые некорректно работают в РФ — трафик через группу «Игры (прокси)»
 # Политику задаёт RULE-SET,games-proxy,Игры (прокси) в config.yaml
 # behavior: classical, format: yaml
 payload:
@@ -16,3 +15,7 @@ payload:
   # NVIDIA: GeForce Experience / NVIDIA App (ops-gx, gfe, download и др.)
   - DOMAIN-SUFFIX,nvidia.com
   - DOMAIN-SUFFIX,geforce.com
+  # CD PROJEKT / GOG: облачные сохранения и сервисы
+  - DOMAIN-SUFFIX,cdpred.services
+  - DOMAIN-SUFFIX,cdprojektred.com
+  - DOMAIN-SUFFIX,gog.com
