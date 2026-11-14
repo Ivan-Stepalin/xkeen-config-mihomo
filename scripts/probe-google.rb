@@ -23,7 +23,7 @@
 #   ruby scripts/probe-google.rb -g Twitch             # другая группа-пробник
 #   MIHOMO_API=http://192.168.1.2:9090 ruby scripts/probe-google.rb
 #
-# В конце печатается готовая строка filter: для группы Google-выход.
+# В конце печатается готовая строка filter: для группы Google-авто.
 
 require 'json'
 require 'net/http'
@@ -153,7 +153,7 @@ puts "Годных узлов: #{clean.size} из #{nodes.size}. Отсорти�
 clean.sort_by! { |(_, ms, _)| ms }
 clean.each { |(short, ms, gl)| printf("  %-44s %5d мс  %s\n", short, ms, gl) }
 
-# Регексп для filter: у группы Google-выход. Из имени узла берётся часть до
+# Регексп для filter: у группы Google-авто. Из имени узла берётся часть до
 # эмодзи и служебного хвоста — она у провайдера стабильнее остального.
 # Экранируются только настоящие метасимволы. Regexp.escape трогает ещё пробел
 # и «#» — в двойных кавычках YAML «\#» невалидная escape-последовательность,
@@ -165,5 +165,5 @@ alts = clean.map do |(short, _, _)|
   bare.gsub(META) { |ch| "\\#{ch}" }
 end
 puts
-puts 'Готовая строка для группы Google-выход в config.yaml:'
+puts 'Готовая строка для группы Google-авто в config.yaml:'
 puts %(    filter: "(?i)(#{alts.join('|')})")

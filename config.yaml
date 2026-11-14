@@ -70,7 +70,7 @@ x-templates:
   select: &select
     type: select
     use: [subscription]
-    proxies: [Выход, Свой узел, Свободный интернет, Подписка, DIRECT]
+    proxies: [Выход, Свой узел, Свободный интернет, Подписка, Подписка YouNet, DIRECT]
 
   # Подписка: общие поля, различаются только url, path и префикс имён.
   provider: &provider
@@ -239,7 +239,11 @@ proxy-groups:
     # описанные в proxies: — то есть оба входа своего узла попадали в этот
     # автопул вторым путём, хотя «Свой узел» и так стоит первым вариантом в
     # каждой группе.
-    include-all-providers: true
+    #
+    # С 14.11.2026 подписок две, поэтому провайдер назван явно. Раньше стояло
+    # include-all-providers: true, и оно втянуло бы в автопул узлы YouNet, а
+    # у них свой отдельный вход — группа «Подписка YouNet».
+    use: [subscription]
     # Семейство nv — самое быстрое, поэтому url-test выбирал именно его, и на
     # него садились все сервисы Google, кроме группы AI. Google блокирует эти
     # IP (петля GOOGLE_ABUSE), из-за чего Gemini падал на заглушку про страну
@@ -253,6 +257,14 @@ proxy-groups:
   - <<: *sub-test
     name: Подписка
     use: [subscription]
+    icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Server.png
+
+  # Вторая подписка, YouNet: автовыбор быстрейшего узла внутри неё. Стоит
+  # отдельно от «Свободного интернета» — это самостоятельный вход, а не
+  # пополнение общего пула.
+  - <<: *sub-test
+    name: Подписка YouNet
+    use: [younet]
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Server.png
 
   # РУБИЛЬНИК. Первый вариант в шаблоне *select, поэтому все сервисные группы
@@ -271,7 +283,7 @@ proxy-groups:
   # «Выход» придётся выбрать один раз.
   - name: Выход
     type: select
-    proxies: [Свободный интернет, Свой узел, Подписка, DIRECT]
+    proxies: [Свободный интернет, Свой узел, Подписка, Подписка YouNet, DIRECT]
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Rocket.png
 
   - <<: *select
@@ -318,13 +330,13 @@ proxy-groups:
   - <<: *select
     name: Hetzner
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Server.png
-    proxies: [Свободный интернет, Подписка, Выход, Свой узел, DIRECT]
+    proxies: [Свободный интернет, Подписка, Подписка YouNet, Выход, Свой узел, DIRECT]
 
   # PASS — передать решение следующему правилу вместо отправки в прокси.
   - <<: *select
     name: Cloudflare
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Cloudflare.png
-    proxies: [PASS, Выход, Свой узел, Свободный интернет, Подписка, DIRECT]
+    proxies: [PASS, Выход, Свой узел, Свободный интернет, Подписка, Подписка YouNet, DIRECT]
 
   # У Google и у остальных AI-сервисов требования к выходу разные и
   # несовместимые, поэтому групп две, а не одна.
@@ -332,7 +344,7 @@ proxy-groups:
   # Google определяет страну по своей гео-базе, а не по тому, где физически
   # стоит сервер, и почти всю подписку считает российской. Для Gemini это
   # заглушка «не поддерживается в вашей стране». Годных узлов единицы, и
-  # список приходится держать руками (см. Google-выход ниже).
+  # список приходится держать руками (см. Google-авто ниже).
   #
   # Claude, ChatGPT и прочим достаточно любого быстрого нероссийского узла:
   # проверено 26.08.2026, api.anthropic.com и api.openai.com отвечают 401
@@ -371,7 +383,7 @@ proxy-groups:
   # India, Singapore и Lt 1 идут после и включаются только если польские умрут.
   # lazy: false — иначе группа не знает, какие узлы живы, до первого запроса,
   # и первый же диалог уходит в мёртвый узел.
-  - name: Google-выход
+  - name: Google-авто
     type: fallback
     url: https://cp.cloudflare.com/generate_204
     expected-status: 204
@@ -385,11 +397,25 @@ proxy-groups:
     filter: "(?i)(Poland n[3467]|India|Singapore|Netherlands Lt 1)"
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Google_Search.png
 
+  # Выход для Google с ручным выбором. По умолчанию стоит «Google-авто» —
+  # прежняя автоматика по белому списку, поведение то же, что было. Ниже в
+  # списке — обе подписки целиком: их автогруппы и каждый узел поштучно.
+  #
+  # Выбирая руками, помните, зачем существует белый список: семейство nv и
+  # российские выходы Google блокирует (петля GOOGLE_ABUSE), и Gemini на них
+  # показывает заглушку про страну. Сам выбор хранится на роутере
+  # (profile.store-selected) и переживает заливку конфига.
+  - name: Google-выход
+    type: select
+    proxies: [Google-авто, Свой узел, Подписка, Подписка YouNet]
+    use: [subscription, younet]
+    icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Google_Search.png
+
   # Вся сессия Google: поиск, аккаунты, Gemini, gstatic, аватарки.
   - <<: *select
     name: Google
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Google.png
-    proxies: [Google-выход, Выход, Свой узел, Свободный интернет, Подписка, DIRECT]
+    proxies: [Google-выход, Выход, Свой узел, Свободный интернет, Подписка, Подписка YouNet, DIRECT]
 
   # Claude, ChatGPT и остальные AI, кроме Google. Здесь белый список не нужен:
   # ограничение только одно — не российский IP, а его уже держит
@@ -397,7 +423,7 @@ proxy-groups:
   - <<: *select
     name: AI
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Bot.png
-    proxies: [Выход, Свой узел, Свободный интернет, Подписка, DIRECT]
+    proxies: [Выход, Свой узел, Свободный интернет, Подписка, Подписка YouNet, DIRECT]
 
   - <<: *select
     name: Twitter
@@ -411,7 +437,7 @@ proxy-groups:
   - <<: *select
     name: PlayStation
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/PlayStation.png
-    proxies: [Турция (резидентский), Выход, Свой узел, Свободный интернет, Подписка, DIRECT]
+    proxies: [Турция (резидентский), Выход, Свой узел, Свободный интернет, Подписка, Подписка YouNet, DIRECT]
 
   - <<: *select
     name: Nintendo
@@ -467,14 +493,15 @@ proxy-groups:
 # ══════════════════════════════════════════════════════════════════════
 # ПОДПИСКА
 #
-# Одна. Вторая (префикс «[B] ») убрана 27.08.2026 как лишняя: свой узел
-# закрывает то, ради чего держали второй источник. Её ссылка осталась в
-# .secrets.yaml под ключом SUB_B — файл локальный, а других копий нет.
+# Две: основная (префикс «[A] ») и YouNet (префикс «[Y] », добавлена
+# 14.11.2026). Прежняя вторая (префикс «[B] ») убрана 27.08.2026; её ссылка
+# осталась в .secrets.yaml под ключом SUB_B — файл локальный, а других копий
+# нет.
 #
-#   path             файл кэша; при добавлении второй подписки он обязан быть
-#                    другим, иначе провайдеры перезапишут файл друг друга;
-#   additional-prefix помечает узлы «[A] », чтобы они не путались с узлами
-#                    своего сервера, описанными в proxies:.
+#   path             файл кэша; у каждой подписки свой, иначе провайдеры
+#                    перезапишут файл друг друга;
+#   additional-prefix помечает узлы «[A] » и «[Y] », чтобы они не путались
+#                    между собой и с узлами своего сервера из proxies:.
 # ══════════════════════════════════════════════════════════════════════
 proxy-providers:
   subscription:
@@ -483,6 +510,13 @@ proxy-providers:
     path: ./proxy-providers/subscription.yaml
     override:
       additional-prefix: "[A] "
+
+  younet:
+    <<: *provider
+    url: ${SUB_YOU}
+    path: ./proxy-providers/younet.yaml
+    override:
+      additional-prefix: "[Y] "
 
 
 # ══════════════════════════════════════════════════════════════════════
