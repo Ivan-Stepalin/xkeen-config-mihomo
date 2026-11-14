@@ -70,7 +70,10 @@ end
 
 # ── Загрузка ──────────────────────────────────────────────────────────
 begin
-  cfg = YAML.load_file(CONFIG)
+  # config.yaml построен на якорях. Psych 4 (Ruby 3.1+) по умолчанию их
+  # отвергает, а Psych 3 (Ruby 2.6 на macOS) не знает ключа aliases: — поэтому
+  # выбираем метод по тому, что есть.
+  cfg = YAML.respond_to?(:unsafe_load_file) ? YAML.unsafe_load_file(CONFIG) : YAML.load_file(CONFIG)
 rescue StandardError => e
   puts "config.yaml не разбирается: #{e.message}"
   exit 1
