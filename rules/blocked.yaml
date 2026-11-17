@@ -1,0 +1,17 @@
+# Заблокированные домены (политику задаёт RULE-SET,blocked,REJECT в config.yaml)
+# behavior: classical, format: yaml — матчеры без политики
+payload:
+  # Twitter / X
+  - DOMAIN-SUFFIX,x.com
+  - DOMAIN-SUFFIX,twitter.com
+  - DOMAIN-SUFFIX,t.co
+  - DOMAIN-SUFFIX,twimg.com
+  - DOMAIN-SUFFIX,twttr.com
+  - DOMAIN-SUFFIX,tweetdeck.com
+  # Reddit
+  - DOMAIN-SUFFIX,reddit.com
+  - DOMAIN-SUFFIX,redd.it
+  - DOMAIN-SUFFIX,redditmedia.com
+  - DOMAIN-SUFFIX,redditstatic.com
+  - DOMAIN-SUFFIX,redditinc.com
+  - DOMAIN-SUFFIX,reddituploads.com

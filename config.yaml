@@ -457,6 +457,11 @@ rule-providers:
     url: https://raw.githubusercontent.com/Ivan-Stepalin/xkeen-config-mihomo/main/rules/others.yaml
     path: ./rule-providers/others.yaml
 
+  blocked:
+    <<: *yaml-classical
+    url: https://raw.githubusercontent.com/Ivan-Stepalin/xkeen-config-mihomo/main/rules/blocked.yaml
+    path: ./rule-providers/blocked.yaml
+
   # ── IP-подсети (Telegram, Meta, Cloudflare) ───────────────────────
   telegram-ips:
     <<: *mrs-ipcidr
@@ -517,6 +522,7 @@ rule-providers:
 rules:
   # ── Системные ─────────────────────────────────────────────────────
   - IP-CIDR,${NODE_S_IP}/32,DIRECT,no-resolve
+  - RULE-SET,blocked,REJECT
   - AND,((DST-PORT,443),(NETWORK,UDP)),QUIC
 
   # ── Google и AI (YouTube выше Google, Google выше общих AI) ───────
