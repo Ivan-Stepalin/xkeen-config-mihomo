@@ -1,4 +1,4 @@
-log-level: silent
+log-level: error
 allow-lan: true
 redir-port: 1080
 tproxy-port: 1081
@@ -32,6 +32,9 @@ sniffer:
   enable: true
   force-dns-mapping: true
   parse-pure-ip: true
+  # Бэкенд LXC 105 (youvpn-xray) не сниффить (исключение на случай попадания в xkeen).
+  skip-src-address:
+    - ${YOUVPN_XRAY_IP}/32
   # Свой узел исключён из сниффинга. Иначе parse-pure-ip плюс TLS-сниффер на
   # 443 разбирают ClientHello соединения к голому IP узла, видят там SNI
   # www.samsung.com (маскировка Reality) и подменяют адресат на настоящий
@@ -40,7 +43,8 @@ sniffer:
   # «REALITY authentication failed» при исправном узле.
   # На сам роутер это не влияло: свои исходящие подключения он не сниффит.
   skip-dst-address:
-    - ${NODE_S_IP}/32
+    # Свой узел (отключён 19.11.2026; раскомментировать при восстановлении):
+    # - ${NODE_S_IP}/32
     # Рабочие стенды. Их имена есть только в /etc/hosts клиента, публичный DNS
     # их не знает. Сниффер брал имя из Host/SNI и подменял им адресат, роутер
     # резолвил имя сам, не находил — и соединение на 80/443 рвалось без ответа
@@ -56,7 +60,7 @@ sniffer:
       override-destination: true
 
 # DNS используется, когда для группы выбран выход «Перевал (DNS)» (type: direct).
-# Пока группа смотрит в VLESS-туннель (Подписка 1/2 или Свой узел), имя домена
+# Пока группа смотрит в туннель (Подписка 1 или Amnezia), имя домена
 # уезжает на удалённый сервер и этот блок не участвует. Когда выбран
 # «Перевал (DNS)», mihomo резолвит домены нейросетей и Google через DNS
 # Перевала (153.80.200.170) и соединяется с его SNI-прокси напрямую.
@@ -90,28 +94,23 @@ x-templates:
   # Группа: компактный ручной выбор из верхнеуровневых выходов.
   select: &select
     type: select
-    proxies: [Прокси по умолчанию, Свой узел, Подписка 1, Подписка 2, Перевал (DNS), DIRECT]
+    proxies: [Прокси по умолчанию, Подписка 1, Подписка 2, Amnezia, Перевал (DNS), DIRECT]
 
   # Подписка: общие поля, различаются только url, path и префикс имён.
+  # Автопроверки отключены — задержка проверяется только вручную из панели.
   provider: &provider
     type: http
     interval: 3600
     health-check:
-      enable: true
+      enable: false
       url: https://cp.cloudflare.com/generate_204
       expected-status: 204
-      interval: 120
 
-  # Группа: автовыбор быстрейшего узла внутри одной подписки.
+  # Группа: ручной выбор узла внутри одной подписки (без автопроверок и lazy).
   # Семейство nv (блокируется Google петлёй GOOGLE_ABUSE) и российские выходы
-  # (🇷🇺) исключены из автовыбора, чтобы url-test не садился на них из-за
-  # минимального пинга.
+  # (🇷🇺) исключены из списка.
   sub-test: &sub-test
-    type: url-test
-    url: https://cp.cloudflare.com/generate_204
-    expected-status: 204
-    interval: 120
-    tolerance: 50
+    type: select
     exclude-filter: "(?i)(nv [0-9]|\U0001F1F7\U0001F1FA)"
 
   # rule-provider: скомпилированный .mrs со списком доменов.
@@ -174,47 +173,46 @@ x-templates:
 #   плейсхолдеры. Обновляются командой ./node/bin/client show router.
 # ══════════════════════════════════════════════════════════════════════
 proxies:
-  # Основной вход. XHTTP в режиме stream-one сворачивает обмен в один поток:
-  # ТСПУ с июня 2026 морозит на 120 секунд всё, что открывает больше трёх
-  # параллельных TLS к одному имени за 350-400 мс, а health-check группы
-  # url-test делает ровно это.
-  - name: Свой узел XHTTP
-    type: vless
-    server: ${NODE_S_IP}
-    port: 443
-    uuid: ${NODE_S_UUID}
-    udp: true
-    packet-encoding: xudp
-    tls: true
-    network: xhttp
-    alpn: [h2]
-    servername: www.samsung.com
-    client-fingerprint: firefox
-    reality-opts:
-      public-key: ${NODE_S_PBK_X}
-      short-id: ${NODE_S_SID_X}
-    xhttp-opts:
-      path: ${NODE_S_PATH}
-      mode: stream-one
-
-  # Запасной вход: классический Vision поверх сырого TCP. Именно эту связку
-  # массово блокировали у проводных операторов РФ, поэтому она вторая, а не
-  # первая — но на замере держится наравне.
-  - name: Свой узел Vision
-    type: vless
-    server: ${NODE_S_IP}
-    port: 2096
-    uuid: ${NODE_S_UUID}
-    udp: true
-    packet-encoding: xudp
-    tls: true
-    flow: xtls-rprx-vision
-    network: tcp
-    servername: www.nvidia.com
-    client-fingerprint: firefox
-    reality-opts:
-      public-key: ${NODE_S_PBK_V}
-      short-id: ${NODE_S_SID_V}
+  # ОТКЛЮЧЁН 19.11.2026 (хвост для восстановления).
+  # Чтобы вернуть свой узел: раскомментируйте узлы ниже, группу «Свой узел»,
+  # IP в sniffer.skip-dst-address и правило IP-CIDR в rules:, а также добавьте
+  # «Свой узел» обратно в *select / «Прокси по умолчанию» / Google.
+  # Ключи NODE_S_* сохранены в .secrets.yaml, скрипты — в node/.
+  #
+  # - name: Свой узел XHTTP
+  #   type: vless
+  #   server: ${NODE_S_IP}
+  #   port: 443
+  #   uuid: ${NODE_S_UUID}
+  #   udp: true
+  #   packet-encoding: xudp
+  #   tls: true
+  #   network: xhttp
+  #   alpn: [h2]
+  #   servername: www.samsung.com
+  #   client-fingerprint: firefox
+  #   reality-opts:
+  #     public-key: ${NODE_S_PBK_X}
+  #     short-id: ${NODE_S_SID_X}
+  #   xhttp-opts:
+  #     path: ${NODE_S_PATH}
+  #     mode: stream-one
+  #
+  # - name: Свой узел Vision
+  #   type: vless
+  #   server: ${NODE_S_IP}
+  #   port: 2096
+  #   uuid: ${NODE_S_UUID}
+  #   udp: true
+  #   packet-encoding: xudp
+  #   tls: true
+  #   flow: xtls-rprx-vision
+  #   network: tcp
+  #   servername: www.nvidia.com
+  #   client-fingerprint: firefox
+  #   reality-opts:
+  #     public-key: ${NODE_S_PBK_V}
+  #     short-id: ${NODE_S_SID_V}
 
   # Резидентский прокси proxy.market, Турция, только для PlayStation: домашний
   # турецкий IP вместо дата-центра. Порт из диапазона 10000-10999 задаёт
@@ -232,12 +230,56 @@ proxies:
     password: ${TR_RES_PASS}
     udp: true
 
+  # Amnezia Premium, Германия: AmneziaWG версии 3 (с HeaderProtectionKey).
+  # Конфиг выгружен из приложения 19.11.2026 отдельным устройством для
+  # роутера — тем же ключом с другого устройства не подключаться, иначе
+  # соединение рвётся у обоих. Поля v3 mihomo понимает не с любой сборки:
+  # в v1.19.24 их нет, в v1.19.30 уже есть.
+  - name: Amnezia DE
+    type: wireguard
+    server: ${AWG_DE_SERVER}
+    port: 8344
+    ip: 100.109.116.32
+    private-key: ${AWG_DE_PRIVATE_KEY}
+    public-key: ${AWG_DE_PUBLIC_KEY}
+    pre-shared-key: ${AWG_DE_PSK}
+    allowed-ips: ['0.0.0.0/0']
+    udp: true
+    mtu: 1280
+    persistent-keepalive: 25
+    remote-dns-resolve: true
+    dns: [100.64.0.1, 8.8.4.4]
+    amnezia-wg-option:
+      version: 3
+      jc: 5
+      jmin: 10
+      jmax: 80
+      s1: 461
+      s2: 22
+      s3: 145
+      s4: 12
+      h1: "1"
+      h2: "2"
+      h3: "3"
+      h4: "4"
+      i1: "<b 0x000100002112a442><r 12>"
+      i2: "<b 0x000300082112a442><r 12><b 0x0019000411000000>"
+      header-protection-key: ${AWG_DE_HPK}
+      content-padding-addition: "10-100"
+      rekey-after-time: "100-120"
+      rekey-timeout: "3-8"
+      reject-after-time: "150-180"
+      keepalive-timeout: "7-13"
+      max-handshake-attempts: "15-20"
+
   # Запасной выход для нейросетей и Google через бесплатный Smart DNS «Перевал»
   # (https://pereval.top). Резолвит домены из dns.nameserver-policy через
   # 153.80.200.170 и отправляет TLS-трафик напрямую на SNI-прокси Перевала.
   - name: Перевал (DNS)
     type: direct
 
+  # Первая подписка (YouVPN) подтягивается динамически через proxy-providers.sub1
+  # с Xray-бэкенда (LXC 105, ${YOUVPN_XRAY_IP}:8389/sub1.yaml) в виде лёгких socks5-портов.
 # ══════════════════════════════════════════════════════════════════════
 proxy-groups:
   # РУБИЛЬНИК. Стоит первым в панели и первым вариантом в шаблоне *select,
@@ -248,32 +290,38 @@ proxy-groups:
   # У Google свой выбор выхода, потому что Gemini сверяет страну по сессии целиком.
   - name: Прокси по умолчанию
     type: select
-    proxies: [Подписка 1, Подписка 2, Свой узел, Перевал (DNS), DIRECT]
+    proxies: [Подписка 1, Подписка 2, Amnezia, Перевал (DNS), DIRECT]
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Rocket.png
 
-  # Свой VPS: автовыбор среди его транспортов. При блокировке одного
-  # транспорта группа сама переходит на другой.
-  - name: Свой узел
-    type: url-test
-    url: https://cp.cloudflare.com/generate_204
-    expected-status: 204
-    interval: 120
-    tolerance: 100
-    lazy: false
-    proxies: [Свой узел XHTTP, Свой узел Vision]
-    icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Server.png
+  # Хвост для восстановления «Свой узел» (отключён 19.11.2026):
+  # - name: Свой узел
+  #   type: url-test
+  #   url: https://cp.cloudflare.com/generate_204
+  #   expected-status: 204
+  #   interval: 120
+  #   tolerance: 100
+  #   lazy: false
+  #   proxies: [Свой узел XHTTP, Свой узел Vision]
+  #   icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Server.png
 
-  # Первая подписка: автовыбор быстрейшего узла (без семейства nv и РФ).
-  - <<: *sub-test
-    name: Подписка 1
-    lazy: false
+  # Первая подписка: динамически подтягивается с Xray-бэкенда (LXC 105, ${YOUVPN_XRAY_IP}).
+  - name: Подписка 1
+    type: select
     use: [sub1]
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Server.png
 
-  # Вторая подписка: автовыбор быстрейшего узла (без РФ).
+  # Вторая подписка: ручной выбор узла (без семейства nv и РФ).
   - <<: *sub-test
     name: Подписка 2
     use: [sub2]
+    icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Server.png
+
+  # Отдельная группа для серверов Amnezia (новые серверы добавлять в proxies:
+  # и в этот список). type: select позволяет выбирать сервер вручную; для
+  # автовыбора по задержке можно сменить type на url-test.
+  - name: Amnezia
+    type: select
+    proxies: [Amnezia DE]
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Server.png
 
   - <<: *select
@@ -311,15 +359,15 @@ proxy-groups:
   - <<: *select
     name: Cloudflare
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Cloudflare.png
-    proxies: [PASS, Прокси по умолчанию, Свой узел, Подписка 1, Подписка 2, Перевал (DNS), DIRECT]
+    proxies: [PASS, Прокси по умолчанию, Подписка 1, Подписка 2, Amnezia, Перевал (DNS), DIRECT]
 
   # Вся сессия Google (поиск, аккаунты, Gemini, gstatic, аватарки) идёт
   # отдельно от остальных AI: можно закрепить конкретную подписку или
   # отдельный сервер из обеих подписок.
   - name: Google
     type: select
-    proxies: [Свой узел, Подписка 2, Подписка 1, Перевал (DNS), Прокси по умолчанию, DIRECT]
-    use: [sub1, sub2]
+    proxies: [Подписка 1, Подписка 2, Amnezia, Перевал (DNS), Прокси по умолчанию, DIRECT]
+    use: [sub2]
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Google.png
 
   # Claude, ChatGPT и остальные AI, кроме Google.
@@ -336,7 +384,7 @@ proxy-groups:
   - <<: *select
     name: PlayStation
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/PlayStation.png
-    proxies: [Турция (резидентский), Прокси по умолчанию, Свой узел, Подписка 1, Подписка 2, Перевал (DNS), DIRECT]
+    proxies: [Турция (резидентский), Прокси по умолчанию, Подписка 1, Подписка 2, Amnezia, Перевал (DNS), DIRECT]
 
   - <<: *select
     name: Nintendo
@@ -391,20 +439,18 @@ proxy-groups:
 #
 # Универсальные слоты sub1 («Подписка 1», префикс «[1] ») и sub2
 # («Подписка 2», префикс «[2] »). Ссылки хранятся в .secrets.yaml под
-# ключами SUB_1 и SUB_2.
+# ключами SUB_1 и SUB_2 (SUB_2 заменён на ProstoKosmos 19.11.2026).
 #
 #   path              файл кэша; у каждой подписки свой, иначе провайдеры
 #                     перезапишут файл друг друга;
 #   additional-prefix помечает узлы «[1] » и «[2] », чтобы они не путались
-#                     между собой и с узлами своего сервера из proxies:.
+#                     между собой и с узлами из proxies:.
 # ══════════════════════════════════════════════════════════════════════
 proxy-providers:
   sub1:
     <<: *provider
     url: ${SUB_1}
     path: ./proxy-providers/sub1.yaml
-    override:
-      additional-prefix: "[1] "
 
   sub2:
     <<: *provider
@@ -412,7 +458,6 @@ proxy-providers:
     path: ./proxy-providers/sub2.yaml
     override:
       additional-prefix: "[2] "
-
 
 # ══════════════════════════════════════════════════════════════════════
 # RULE-PROVIDER-Ы
@@ -461,6 +506,12 @@ rule-providers:
     <<: *yaml-classical
     url: https://raw.githubusercontent.com/Ivan-Stepalin/xkeen-config-mihomo/main/rules/blocked.yaml
     path: ./rule-providers/blocked.yaml
+
+  edge-cache:
+    type: file
+    behavior: classical
+    format: yaml
+    path: ./rule-providers/edge-cache.yaml
 
   # ── IP-подсети (Telegram, Meta, Cloudflare) ───────────────────────
   telegram-ips:
@@ -521,7 +572,9 @@ rule-providers:
 # ══════════════════════════════════════════════════════════════════════
 rules:
   # ── Системные ─────────────────────────────────────────────────────
-  - IP-CIDR,${NODE_S_IP}/32,DIRECT,no-resolve
+  - SRC-IP-CIDR,${YOUVPN_XRAY_IP}/32,DIRECT,no-resolve
+  # Свой узел (отключён 19.11.2026; раскомментировать при восстановлении):
+  # - IP-CIDR,${NODE_S_IP}/32,DIRECT,no-resolve
   - RULE-SET,blocked,REJECT
   - AND,((DST-PORT,443),(NETWORK,UDP)),QUIC
 
@@ -555,6 +608,7 @@ rules:
 
   # ── Прочее, Cloudflare, реестр РКН и торренты ─────────────────────
   - RULE-SET,others,OTHERS
+  - RULE-SET,edge-cache,Прокси по умолчанию
   - OR,((GEOSITE,cloudflare),(RULE-SET,cloudflare-ips,no-resolve)),Cloudflare
   - OR,((RULE-SET,refilter-domains),(RULE-SET,refilter-ips,no-resolve)),Прокси по умолчанию
   - OR,((RULE-SET,torrent-clients),(RULE-SET,torrent-trackers)),DIRECT

@@ -21,3 +21,4 @@ proxy-providers/*.url
 # Байткод Python из node/lib — создаётся при каждом запуске скриптов проекта.
 __pycache__/
 *.pyc
+rules/edge-cache.yaml
