@@ -380,6 +380,11 @@ proxy-groups:
     name: Steam (чат и голос)
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Steam.png
 
+  # Домены Steam, которые напрямую не открываются (список — rules/steam-proxy.yaml).
+  - <<: *select
+    name: Steam (прокси)
+    icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Steam.png
+
   - <<: *select
     name: Epic Games
     icon: https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Epic_Games.png
@@ -467,6 +472,11 @@ rule-providers:
     <<: *yaml-classical
     url: https://raw.githubusercontent.com/Ivan-Stepalin/xkeen-config-mihomo/main/rules/tcl.yaml
     path: ./rule-providers/tcl.yaml
+
+  steam-proxy:
+    <<: *yaml-classical
+    url: https://raw.githubusercontent.com/Ivan-Stepalin/xkeen-config-mihomo/main/rules/steam-proxy.yaml
+    path: ./rule-providers/steam-proxy.yaml
 
   games-proxy:
     <<: *yaml-classical
@@ -573,10 +583,8 @@ rules:
 
   # ── Игры на ПК (чат Steam стоит выше общего правила Steam) ────────
   - OR,((DOMAIN-SUFFIX,steamcommunity.com),(DOMAIN-SUFFIX,steam-chat.com)),Steam (чат и голос)
-  # Картинки магазина с Akamai: узлы 87.245.216.x у провайдера не отвечают
-  # (21.11.2026 — таймаут напрямую, 60–150 мс через Amnezia и Подписку 2).
-  # Только статика магазина; загрузки игр идут с steamcontent и остаются в Steam.
-  - DOMAIN-SUFFIX,akamai.steamstatic.com,Прокси по умолчанию
+  # Исключения Steam, которым нужен прокси, — выше общего правила Steam.
+  - RULE-SET,steam-proxy,Steam (прокси)
   - GEOSITE,steam,Steam
   - GEOSITE,epicgames,Epic Games
   - GEOSITE,ea,EA

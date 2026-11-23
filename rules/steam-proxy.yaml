@@ -1,0 +1,9 @@
+# Домены Steam, которые напрямую не открываются: трафик через группу «Steam (прокси)».
+# Политику задаёт RULE-SET,steam-proxy,Steam (прокси) в config.yaml — правило стоит
+# выше GEOSITE,steam, иначе общий Steam (DIRECT) перехватит домены раньше.
+# behavior: classical, format: yaml
+payload:
+  # Картинки и видео магазина с Akamai: узлы 87.245.216.x у провайдера не
+  # отвечают (21.11.2026 — таймаут напрямую, 60–150 мс через Amnezia и
+  # Подписку 2). Загрузки игр идут с steamcontent и остаются в Steam.
+  - DOMAIN-SUFFIX,akamai.steamstatic.com
