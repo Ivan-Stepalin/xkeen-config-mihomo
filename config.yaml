@@ -573,6 +573,10 @@ rules:
 
   # ── Игры на ПК (чат Steam стоит выше общего правила Steam) ────────
   - OR,((DOMAIN-SUFFIX,steamcommunity.com),(DOMAIN-SUFFIX,steam-chat.com)),Steam (чат и голос)
+  # Картинки магазина с Akamai: узлы 87.245.216.x у провайдера не отвечают
+  # (21.11.2026 — таймаут напрямую, 60–150 мс через Amnezia и Подписку 2).
+  # Только статика магазина; загрузки игр идут с steamcontent и остаются в Steam.
+  - DOMAIN-SUFFIX,akamai.steamstatic.com,Прокси по умолчанию
   - GEOSITE,steam,Steam
   - GEOSITE,epicgames,Epic Games
   - GEOSITE,ea,EA
